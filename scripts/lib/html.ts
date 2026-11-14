@@ -49,7 +49,8 @@ export function htmlToText(html: string): string {
       .replace(/<!--[\s\S]*?-->/g, ' ')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|li|tr|td|th|h[1-6]|section|article|header|footer|dt|dd|span)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' '),
+      // Les attributs entre guillemets peuvent contenir « > » (data-action="click->modal#open").
+      .replace(/<(?:[^>"']|"[^"]*"|'[^']*')*>/g, ' '),
   )
     .replace(/[ \t  ]+/g, ' ')
     .replace(/ *\n */g, '\n')
@@ -121,4 +122,39 @@ export function extractLinks(html: string, baseUrl: string): string[] {
     }
   }
   return [...links];
+}
+
+/**
+ * Découpe une page ou un e-mail en blocs, un par lien : le texte qui suit un lien, jusqu'au
+ * lien suivant vers une autre adresse, décrit la cible de ce lien (carte d'annonce, ligne d'alerte).
+ */
+export function segmentByLinks(html: string, baseUrl?: string): { href: string; text: string }[] {
+  const hrefs: string[] = [];
+  const marked = html.replace(
+    /<a\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/a>/gi,
+    (_match, attrs: string, inner: string) => {
+      const href = decodeEntities(attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)')/i)?.slice(2).find(Boolean) ?? '').trim();
+      let absolute = href;
+      try {
+        absolute = baseUrl ? new URL(href, baseUrl).toString() : href;
+      } catch {
+        // Lien invalide : gardé tel quel, il sera ignoré.
+      }
+      hrefs.push(absolute);
+      return `\n[[LIEN:${hrefs.length - 1}]]\n${inner}`;
+    },
+  );
+  const parts = htmlToText(marked).split(/\[\[LIEN:(\d+)\]\]/);
+  const segments: { href: string; text: string }[] = [];
+  for (let i = 1; i < parts.length; i += 2) {
+    const href = hrefs[Number(parts[i])];
+    const body = parts[i + 1] ?? '';
+    const last = segments[segments.length - 1];
+    if (last && last.href === href) last.text += `\n${body}`;
+    else segments.push({ href, text: body });
+  }
+  // Le texte placé avant le premier lien (photo sans lien, par exemple) rejoint le premier bloc.
+  const preamble = parts[0] ?? '';
+  if (segments[0] && preamble.trim().length < 400) segments[0].text = `${preamble}\n${segments[0].text}`;
+  return segments.map((s) => ({ href: s.href, text: s.text.trim() }));
 }

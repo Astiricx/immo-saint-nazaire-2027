@@ -85,6 +85,7 @@ export function detectType(title: string, description = '', surface: number | nu
     if (/\b[tf]\s?[3-9]\b|\b[3-9] pieces\b|\btrois pieces\b/.test(s)) return 'T3+';
     if (/\b[tf]\s?2\b|\b2 pieces\b|\bdeux pieces\b/.test(s)) return 'T2';
     if (/\b[tf]\s?1\b|\b1 piece\b|\bune piece\b/.test(s)) return 'T1';
+    if (/\bt\s?0\b/.test(s)) return 'studio';
     if (/\bstudio\b|\bstudette\b/.test(s)) return 'studio';
     return null;
   };

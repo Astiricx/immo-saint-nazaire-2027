@@ -274,3 +274,33 @@ test('alerte e-mail : les paramètres de suivi sont retirés des liens publiés'
     'https://www.leboncoin.fr/ad/locations/2914507731?page=2',
   );
 });
+
+test('extraction : champs légaux d’une fiche d’agence (loi ALUR), sans signe €', () => {
+  const html = `<h1>Location studio - 38.37m² à Saint nazaire (44600)</h1>
+  <p>Saint-Nazaire - Avenue de Penhouët</p><p>Beau studio meublé entièrement rénové.</p>
+  <dl><dt>Typologie</dt><dd>T0</dd><dt>Date de disponibilité</dt><dd>20/07/2026</dd>
+  <dt>Loyer hors charges</dt><dd>600</dd><dt>Montant des charges</dt><dd>11 (1)</dd>
+  <dt>Dépôt de garantie</dt><dd>1200</dd><dt>Honoraires charge locataire</dt><dd>448.93 TTC (2)</dd></dl>
+  <p>Montant estimé des dépenses annuelles d'énergie</p><p>Entre 1230 €</p><p>et 1690 €</p><p>par an</p>`;
+  const e = extractFromHtml(html);
+  assert.equal(e.rent, 600);
+  assert.equal(e.chargesMode, 'hc');
+  assert.equal(e.charges, 11);
+  assert.equal(e.address, 'Avenue de Penhouët');
+  const listing = normalizeListing(toRawListing(e, { source: 's', sourceLabel: 'S', ref: 'x', url: 'https://x.fr/x' })!, TODAY)!;
+  assert.equal(listing.type, 'studio');
+  assert.equal(listing.availableFrom, '2026-07-20');
+  assert.equal(evaluate(listing).monthlyCost, 611);
+});
+
+test('extraction : le coût annuel de l’énergie n’est pas un loyer', () => {
+  assert.equal(extractFromText('Studio 20 m²\nDépenses annuelles d’énergie\nEntre 1230 €\net 1690 €\npar an').rent, null);
+});
+
+test('texte : attributs contenant « > » et découpe par liens', async () => {
+  const { segmentByLinks } = await import('../scripts/lib/html');
+  assert.equal(htmlToText('<a data-action="click->modal#open" href="/x">Appeler</a>'), 'Appeler');
+  const segments = segmentByLinks('<a href="/a/1">T2 40 m²</a> 520 € par mois <a href="/a/2">Studio 20 m²</a> 410 €', 'https://x.fr/');
+  assert.deepEqual(segments.map((s) => s.href), ['https://x.fr/a/1', 'https://x.fr/a/2']);
+  assert.match(segments[0].text, /520 € par mois/);
+});

@@ -92,8 +92,9 @@ function fromJsonLd(objects: Record<string, unknown>[]): LdFields {
 }
 
 const PRICE_CONTEXT = /loyer|prix|mensuel|par mois|\/\s*mois|\bmois\b|\bcc\b|\bhc\b|charges/i;
-/** Montants qui ne sont pas un loyer : frais, dépôt de garantie, honoraires, parking. */
-const NOT_RENT = /frais|honoraires|d[ée]p[ôo]t|garantie|caution|parking|garage|[ée]tat des lieux/i;
+/** Montants qui ne sont pas un loyer : frais, dépôt de garantie, honoraires, parking, énergie. */
+const NOT_RENT =
+  /frais|honoraires|d[ée]p[ôo]t|garantie|caution|parking|garage|[ée]tat des lieux|[ée]nergie|entre\s*$/i;
 
 /**
  * Loyer dans un texte : le premier montant plausible (150 à 3 000 €)
@@ -112,12 +113,29 @@ export function findRent(text: string): { rent: number; window: string } | null 
     const sameLineBefore = text.slice(lineStart + 1, index);
     const afterEnd = text.indexOf('\n', index + m[0].length + 1);
     const after = text.slice(index, Math.min(index + m[0].length + 60, afterEnd === -1 ? text.length : afterEnd + 30));
-    if (NOT_RENT.test(sameLineBefore)) continue;
+    if (NOT_RENT.test(sameLineBefore) || /^\S*\s*(?:\n\s*)?(?:et\s+\d|par an|\/\s*an)/i.test(text.slice(index + m[0].length, index + m[0].length + 20))) {
+      continue;
+    }
     const candidate = { rent: Math.round(value), window: `${before}${after}` };
     if (PRICE_CONTEXT.test(before) || PRICE_CONTEXT.test(after)) return candidate;
     fallback ??= candidate;
   }
   return fallback;
+}
+
+/** Loyer lu dans les champs étiquetés, s'ils existent. */
+function labeledRent(text: string): Pick<Extracted, 'rent' | 'chargesMode' | 'charges'> | null {
+  const valid = (n: number | null) => (n != null && n >= 150 && n <= 3000 ? Math.round(n) : null);
+  const cc = valid(labeledAmount(text, LABEL_RENT_CC));
+  if (cc) return { rent: cc, chargesMode: 'cc', charges: null };
+  const hc = valid(labeledAmount(text, LABEL_RENT_HC));
+  const charges = labeledAmount(text, LABEL_CHARGES);
+  if (hc) {
+    return { rent: hc, chargesMode: 'hc', charges: charges != null && charges < 400 ? Math.round(charges) : null };
+  }
+  const plain = valid(labeledAmount(text, LABEL_RENT));
+  if (plain) return { rent: plain, ...chargesFrom(labeledValue(text, LABEL_RENT) ?? '') };
+  return null;
 }
 
 export function chargesFrom(window: string): Pick<Extracted, 'chargesMode' | 'charges'> {
@@ -138,12 +156,13 @@ export function findSurface(text: string): number | null {
   return value >= 8 && value <= 400 ? value : null;
 }
 
-const STREET_TYPES = ['rue', 'avenue', 'boulevard', 'bd', 'place', 'allée', 'allee', 'quai', 'impasse', 'chemin', 'square', 'cours', 'route']
+const STREET_TYPES = ['rue', 'avenue', 'boulevard', 'bd', 'place', 'allée', 'allee', 'quai', 'impasse', 'chemin', 'route']
   .flatMap((w) => [w, w[0].toUpperCase() + w.slice(1), w.toUpperCase()])
   .join('|');
-const PARTICLES = '(?:(?:de|du|des|la|le|les|DE|DU|DES|LA|LE|LES)\\s+|[lLdD][\'’])*';
+// Espaces horizontaux seulement : une adresse ne déborde pas sur la ligne suivante.
+const PARTICLES = '(?:(?:de|du|des|la|le|les|DE|DU|DES|LA|LE|LES)[ \\t]+|[lLdD][\'’])*';
 const STREET_RE = new RegExp(
-  `(?:\\b\\d{1,4}\\s*(?:bis|ter)?\\s*,?\\s*)?\\b(?:${STREET_TYPES})\\b(?:\\s+${PARTICLES}[A-ZÀ-Ý][A-Za-zÀ-ÿ'’-]+){1,4}`,
+  `(?:\\b\\d{1,4}[ \\t]*(?:bis|ter)?[ \\t]*,?[ \\t]*)?\\b(?:${STREET_TYPES})\\b(?:[ \\t]+${PARTICLES}[A-ZÀ-Ý][A-Za-zÀ-ÿ'’-]+){1,4}`,
 );
 
 export function findStreet(text: string): string | null {
@@ -165,19 +184,57 @@ export function findAvailability(text: string): string | null {
   return m ? m[0].trim() : null;
 }
 
+/**
+ * Valeur d'un champ étiqueté, sur la même ligne (« Loyer : 600 € ») ou la suivante
+ * (« Loyer hors charges » puis « 600 »). C'est la présentation imposée par la loi ALUR
+ * aux annonces d'agence : loyer, charges, dépôt de garantie, honoraires sur des lignes séparées.
+ */
+export function labeledValue(text: string, label: RegExp): string | null {
+  const lines = text.split('\n').map((l) => l.trim());
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = lines[i].match(label);
+    if (!m || m.index !== 0) continue;
+    const rest = lines[i].slice(m[0].length).replace(/^[\s:：-]+/, '');
+    if (/\d/.test(rest)) return rest;
+    const next = lines[i + 1] ?? '';
+    if (/\d/.test(next)) return next;
+  }
+  return null;
+}
+
+function labeledAmount(text: string, label: RegExp): number | null {
+  const value = labeledValue(text, label);
+  const number = value?.match(/\d{1,3}(?:[ \u00a0\u202f.]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?/)?.[0];
+  if (!number) return null;
+  const [amount] = parseAmounts(`${number} €`);
+  return amount ?? null;
+}
+
+const LABEL_RENT_CC = /loyer(?: mensuel)?(?:,)? (?:charges comprises|charges incluses|cc|tcc|tout compris)/i;
+const LABEL_RENT_HC = /loyer(?: mensuel)?(?:,)? (?:hors charges|hc)|loyer de base|loyer nu/i;
+const LABEL_CHARGES = /montant des charges|provisions? (?:pour|sur) charges|charges(?: locatives| mensuelles| forfaitaires)?(?=\s*[:\n]|\s*$)/i;
+const LABEL_RENT = /loyer(?: mensuel)?(?=\s*[:\n]|\s*$)/i;
+const LABEL_AVAILABILITY = /(?:date de )?disponibilit[ée]/i;
+
 /** Extraction depuis un bloc de texte (annonce dans un e-mail d'alerte, par exemple). */
 export function extractFromText(text: string, title = ''): Extracted {
-  const price = findRent(text);
-  const charges = price ? chargesFrom(price.window) : { chargesMode: null, charges: null };
+  const fields = labeledRent(text);
+  const price = fields ? null : findRent(`${title}\n${text}`);
+  const charges = fields
+    ? { chargesMode: fields.chargesMode, charges: fields.charges }
+    : price
+      ? chargesFrom(price.window)
+      : { chargesMode: null, charges: null };
+  const availability = labeledValue(text, LABEL_AVAILABILITY);
   return {
     title: title || text.split('\n').find((line) => line.trim().length > 8)?.trim() || '',
     description: text.slice(0, 1200),
-    rent: price?.rent ?? null,
+    rent: fields?.rent ?? price?.rent ?? null,
     ...charges,
     surface: findSurface(title) ?? findSurface(text),
     locationText: findLocation(`${title}\n${text}`),
     address: findStreet(text),
-    availabilityText: findAvailability(text),
+    availabilityText: availability ? `Disponible le ${availability}` : findAvailability(text),
     lat: null,
     lng: null,
   };
@@ -204,7 +261,9 @@ export function extractFromHtml(html: string): Extracted {
       ? `${ld.locality ?? ''}${ld.postcode ? ` (${ld.postcode})` : ''}`.trim()
       : fromText.locationText;
 
-  const rent = ld.rent && ld.rent >= 150 && ld.rent <= 3000 ? Math.round(ld.rent) : fromText.rent;
+  const textHasFields = labeledRent(main) !== null;
+  const rent =
+    !textHasFields && ld.rent && ld.rent >= 150 && ld.rent <= 3000 ? Math.round(ld.rent) : fromText.rent;
   const charges =
     rent === fromText.rent
       ? { chargesMode: fromText.chargesMode, charges: fromText.charges }

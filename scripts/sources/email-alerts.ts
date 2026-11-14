@@ -1,6 +1,6 @@
 import type { RawListing } from '../../src/lib/types';
 import { extractFromText, toRawListing } from '../lib/extract';
-import { decodeEntities, htmlToText } from '../lib/html';
+import { segmentByLinks } from '../lib/html';
 import { USER_AGENT } from '../lib/http';
 import type { ListingSource } from './types';
 
@@ -88,40 +88,12 @@ async function resolveLink(href: string, portal: Portal): Promise<string | null>
 const NOISE_LINK =
   /unsubscribe|desinscri|désinscri|preferences|parametres|mon-compte|mes-alertes|facebook|instagram|twitter|linkedin|youtube|apple\.com|play\.google|aide|help|mentions|confidentialite|cgu/i;
 
-const MARKER = (n: number) => `\n[[LIEN:${n}]]\n`;
-
 /**
- * Découpe un e-mail d'alerte en annonces : chaque lien est un repère, le texte qui suit
- * (jusqu'au lien suivant vers une autre adresse) décrit l'annonce. Un bloc n'est retenu
+ * Découpe un e-mail d'alerte en annonces : un bloc par lien. Un bloc n'est retenu
  * que s'il contient un loyer et une surface.
  */
 export function parseAlertEmail(html: string, portal: Portal, receivedAt: string): RawListing[] {
-  const hrefs: string[] = [];
-  const marked = html.replace(
-    /<a\b[^>]*\bhref\s*=\s*("([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi,
-    (_match, _q, dq: string | undefined, sq: string | undefined, inner: string) => {
-      const href = decodeEntities(dq ?? sq ?? '').trim();
-      hrefs.push(href);
-      return `${MARKER(hrefs.length - 1)}${inner}`;
-    },
-  );
-  const text = htmlToText(marked);
-
-  // Découpe en segments : [index du lien, texte jusqu'au prochain lien vers une autre adresse].
-  const parts = text.split(/\[\[LIEN:(\d+)\]\]/);
-  const segments: { href: string; text: string }[] = [];
-  let preamble = parts[0] ?? '';
-  for (let i = 1; i < parts.length; i += 2) {
-    const href = hrefs[Number(parts[i])];
-    const body = parts[i + 1] ?? '';
-    const last = segments[segments.length - 1];
-    if (last && last.href === href) last.text += `\n${body}`;
-    else segments.push({ href, text: body });
-  }
-  // Le texte placé avant le premier lien (photo sans lien, par exemple) rejoint le premier segment.
-  if (segments[0] && preamble.trim().length < 400) segments[0].text = `${preamble}\n${segments[0].text}`;
-  preamble = '';
-
+  const segments = segmentByLinks(html);
   const listings: RawListing[] = [];
   const seen = new Set<string>();
   for (const segment of segments) {
