@@ -1,6 +1,30 @@
 {
-  "generatedAt": "2026-11-14T18:17:45.127Z",
+  "generatedAt": "2026-11-14T22:54:05.041Z",
   "sources": [
+    {
+      "id": "leboncoin",
+      "label": "Leboncoin (via Apify)",
+      "status": "inactive",
+      "found": 0,
+      "kept": 0,
+      "message": "secret APIFY_TOKEN non configuré"
+    },
+    {
+      "id": "seloger",
+      "label": "SeLoger (via Apify)",
+      "status": "inactive",
+      "found": 0,
+      "kept": 0,
+      "message": "secret APIFY_TOKEN non configuré"
+    },
+    {
+      "id": "bienici",
+      "label": "Bien'ici (via Apify)",
+      "status": "inactive",
+      "found": 0,
+      "kept": 0,
+      "message": "secret APIFY_TOKEN non configuré"
+    },
     {
       "id": "alertes-email",
       "label": "Alertes e-mail des portails",
@@ -14,7 +38,8 @@
       "label": "Square Habitat",
       "status": "ok",
       "found": 4,
-      "kept": 1
+      "kept": 1,
+      "message": "1 annonce(s) lue(s) sur la page de résultats"
     },
     {
       "id": "foncia",
@@ -31,6 +56,14 @@
       "found": 18,
       "kept": 4,
       "message": "18 fiche(s) fermée(s) aux robots par le site ; 18 annonce(s) lue(s) sur la page de résultats"
+    },
+    {
+      "id": "ouestfrance-immo",
+      "label": "Ouest-France Immo",
+      "status": "bloquee",
+      "found": 0,
+      "kept": 0,
+      "message": "robots.txt n'autorise pas /louer/appartement/saint-nazaire-44-44184/"
     },
     {
       "id": "laforet",
