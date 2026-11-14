@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T18:07:05.929Z",
+  "generatedAt": "2026-11-14T18:09:49.603Z",
   "sources": [
     {
       "id": "alertes-email",
@@ -28,17 +28,16 @@
       "id": "fnaim",
       "label": "FNAIM",
       "status": "ok",
-      "found": 0,
-      "kept": 0,
-      "message": "18 fiche(s) illisible(s) ou non autorisée(s)"
+      "found": 18,
+      "kept": 4,
+      "message": "18 fiche(s) fermée(s) aux robots par le site ; 18 annonce(s) lue(s) sur la page de résultats"
     },
     {
       "id": "laforet",
       "label": "Laforêt",
       "status": "ok",
-      "found": 0,
-      "kept": 0,
-      "message": "1 fiche(s) illisible(s) ou non autorisée(s)"
+      "found": 1,
+      "kept": 0
     },
     {
       "id": "flux",
@@ -50,13 +49,135 @@
     }
   ],
   "stats": {
-    "collected": 4,
+    "collected": 23,
     "duplicates": 0,
     "unreadable": 0,
     "rejected": {
-      "type": 3,
-      "budget": 4
+      "type": 15,
+      "budget": 17,
+      "distance": 2,
+      "ville": 1
     }
   },
-  "listings": []
+  "listings": [
+    {
+      "id": "fnaim-18-location-appartement-loire-atlantique-44",
+      "source": "fnaim",
+      "sourceLabel": "FNAIM",
+      "url": "https://www.fnaim.fr/annonce-immobiliere/53233236/18-location-appartement-loire-atlantique-44.htm",
+      "title": "Appartement 1 pièce 16m²",
+      "description": "Appartement 1 pièce 16m²\n398€\npar mois\nSTUDIO MEUBLE - ETUDIANT\nDans une résidence sécurisée, studio meublé composé d'une entrée avec rangement, une salle d'eau avec WC, une pièce de vie avec coin cuisine aménagée et équipée.\nUne place de stationnement privative.\nDisponibilité ...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
+      "type": "T1",
+      "isShared": false,
+      "rent": 398,
+      "chargesIncluded": false,
+      "charges": null,
+      "surface": 16,
+      "furnished": true,
+      "city": "Saint-Nazaire",
+      "postcode": null,
+      "districtId": null,
+      "address": null,
+      "lat": null,
+      "lng": null,
+      "locationPrecision": "inconnue",
+      "availableFrom": null,
+      "publishedAt": null,
+      "firstSeen": "2026-11-14",
+      "features": [
+        "Stationnement"
+      ],
+      "collector": "fnaim"
+    },
+    {
+      "id": "fnaim-18-location-appartement-st-nazaire-44600",
+      "source": "fnaim",
+      "sourceLabel": "FNAIM",
+      "url": "https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm",
+      "title": "Appartement 1 pièce 31m² ST NAZAIRE 44600",
+      "description": "Appartement 1 pièce 31m² ST NAZAIRE 44600\n545€\npar mois\nBalcon\nAscenseur\nÀ LOUER ! Découvrez cet appartement neuf T1 situé au cœur de Saint-Nazaire.\nAvec une superficie de 31 m², cet espace de vie est idéal pour les jeunes actifs ou les étudiants à la recherche d'un lieu confortable et pratique.\nVous apprécierez le conf...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
+      "type": "T1",
+      "isShared": false,
+      "rent": 545,
+      "chargesIncluded": false,
+      "charges": null,
+      "surface": 31,
+      "furnished": false,
+      "city": "Saint-Nazaire",
+      "postcode": "44600",
+      "districtId": null,
+      "address": null,
+      "lat": null,
+      "lng": null,
+      "locationPrecision": "inconnue",
+      "availableFrom": null,
+      "publishedAt": null,
+      "firstSeen": "2026-11-14",
+      "features": [
+        "Balcon",
+        "Ascenseur"
+      ],
+      "collector": "fnaim"
+    },
+    {
+      "id": "fnaim-18-location-appartement-st-nazaire-44600",
+      "source": "fnaim",
+      "sourceLabel": "FNAIM",
+      "url": "https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm",
+      "title": "Appartement 1 pièce 31m² ST NAZAIRE 44600",
+      "description": "Appartement 1 pièce 31m² ST NAZAIRE 44600\n545€\npar mois\nBalcon\nAscenseur\nÀ LOUER ! Découvrez cet appartement neuf T1 situé au cœur de Saint-Nazaire.\nAvec une superficie de 31 m², cet espace de vie est idéal pour les jeunes actifs ou les étudiants à la recherche d'un lieu confortable et pratique.\nVous apprécierez le conf...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
+      "type": "T1",
+      "isShared": false,
+      "rent": 545,
+      "chargesIncluded": false,
+      "charges": null,
+      "surface": 31,
+      "furnished": false,
+      "city": "Saint-Nazaire",
+      "postcode": "44600",
+      "districtId": null,
+      "address": null,
+      "lat": null,
+      "lng": null,
+      "locationPrecision": "inconnue",
+      "availableFrom": null,
+      "publishedAt": null,
+      "firstSeen": "2026-11-14",
+      "features": [
+        "Balcon",
+        "Ascenseur"
+      ],
+      "collector": "fnaim"
+    },
+    {
+      "id": "fnaim-18-location-appartement-st-nazaire-44600",
+      "source": "fnaim",
+      "sourceLabel": "FNAIM",
+      "url": "https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm",
+      "title": "Appartement 1 pièce 31m² ST NAZAIRE 44600",
+      "description": "Appartement 1 pièce 31m² ST NAZAIRE 44600\n545€\npar mois\nBalcon\nAscenseur\nÀ LOUER ! Découvrez cet appartement neuf T1 situé au cœur de Saint-Nazaire.\nAvec une superficie de 31 m², cet espace de vie est idéal pour les jeunes actifs ou les étudiants à la recherche d'un lieu confortable et pratique.\nVous apprécierez le conf...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
+      "type": "T1",
+      "isShared": false,
+      "rent": 545,
+      "chargesIncluded": false,
+      "charges": null,
+      "surface": 31,
+      "furnished": false,
+      "city": "Saint-Nazaire",
+      "postcode": "44600",
+      "districtId": null,
+      "address": null,
+      "lat": null,
+      "lng": null,
+      "locationPrecision": "inconnue",
+      "availableFrom": null,
+      "publishedAt": null,
+      "firstSeen": "2026-11-14",
+      "features": [
+        "Balcon",
+        "Ascenseur"
+      ],
+      "collector": "fnaim"
+    }
+  ]
 }
