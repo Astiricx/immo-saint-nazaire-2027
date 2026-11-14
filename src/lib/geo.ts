@@ -105,7 +105,7 @@ export const DISTRICTS: District[] = [
     zone: 'proche',
     lat: 47.2925,
     lng: -2.1905,
-    keywords: ['mean penhoet', 'penhoet', 'mean'],
+    keywords: ['mean penhoet', 'penhoet', 'penhouet', 'mean'],
   },
   {
     id: 'prezegat',
