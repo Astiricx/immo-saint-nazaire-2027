@@ -1,11 +1,62 @@
 {
-  "generatedAt": null,
-  "sources": [],
+  "generatedAt": "2026-11-14T18:04:39.535Z",
+  "sources": [
+    {
+      "id": "alertes-email",
+      "label": "Alertes e-mail des portails",
+      "status": "inactive",
+      "found": 0,
+      "kept": 0,
+      "message": "secrets IMAP_USER et IMAP_PASSWORD non configurés"
+    },
+    {
+      "id": "squarehabitat",
+      "label": "Square Habitat",
+      "status": "ok",
+      "found": 4,
+      "kept": 0
+    },
+    {
+      "id": "foncia",
+      "label": "Foncia",
+      "status": "bloquee",
+      "found": 0,
+      "kept": 0,
+      "message": "le site refuse l'accès automatisé (HTTP 403)"
+    },
+    {
+      "id": "fnaim",
+      "label": "FNAIM",
+      "status": "ok",
+      "found": 0,
+      "kept": 0,
+      "message": "18 fiche(s) illisible(s) ou non autorisée(s)"
+    },
+    {
+      "id": "laforet",
+      "label": "Laforêt",
+      "status": "ok",
+      "found": 0,
+      "kept": 0,
+      "message": "1 fiche(s) illisible(s) ou non autorisée(s)"
+    },
+    {
+      "id": "flux",
+      "label": "Flux JSON",
+      "status": "inactive",
+      "found": 0,
+      "kept": 0,
+      "message": "variable FEED_URLS non configurée"
+    }
+  ],
   "stats": {
-    "collected": 0,
+    "collected": 4,
     "duplicates": 0,
     "unreadable": 0,
-    "rejected": {}
+    "rejected": {
+      "type": 3,
+      "budget": 4
+    }
   },
   "listings": []
 }
