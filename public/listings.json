@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T18:12:23.988Z",
+  "generatedAt": "2026-11-14T18:13:49.915Z",
   "sources": [
     {
       "id": "alertes-email",
@@ -14,7 +14,7 @@
       "label": "Square Habitat",
       "status": "ok",
       "found": 4,
-      "kept": 0
+      "kept": 1
     },
     {
       "id": "foncia",
@@ -55,7 +55,7 @@
     "rejected": {
       "type": 15,
       "budget": 17,
-      "distance": 3
+      "distance": 2
     }
   },
   "listings": [
@@ -117,6 +117,33 @@
         "Ascenseur"
       ],
       "collector": "fnaim"
+    },
+    {
+      "id": "squarehabitat-10r9p9x",
+      "source": "squarehabitat",
+      "sourceLabel": "Square Habitat",
+      "url": "https://www.squarehabitat.fr/square-habitat-atlantique-vendee/annonces/biens/location/appartement/saint-nazaire/b8d0e0b3-9f72-49b8-8951-01aa00cb7695",
+      "title": "Location studio - 38.37m² à Saint nazaire (44600)",
+      "description": "Saint-Nazaire - Avenue de PenhouëtBeau studio meublé entièrement rénové composé d'une entrée, d'une cuisine aménagée et équipée (plaques, hotte, fou",
+      "type": "studio",
+      "isShared": false,
+      "rent": 600,
+      "chargesIncluded": false,
+      "charges": 11,
+      "surface": 38.4,
+      "furnished": true,
+      "city": "Saint-Nazaire",
+      "postcode": "44600",
+      "districtId": null,
+      "address": "Avenue de Penhouët",
+      "lat": null,
+      "lng": null,
+      "locationPrecision": "inconnue",
+      "availableFrom": "2026-07-20",
+      "publishedAt": null,
+      "firstSeen": "2026-11-14",
+      "features": [],
+      "collector": "squarehabitat"
     },
     {
       "id": "fnaim-10n0qyj",
