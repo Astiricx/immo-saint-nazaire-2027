@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T18:15:47.801Z",
+  "generatedAt": "2026-11-14T18:17:45.127Z",
   "sources": [
     {
       "id": "alertes-email",
@@ -134,11 +134,11 @@
       "furnished": true,
       "city": "Saint-Nazaire",
       "postcode": "44600",
-      "districtId": null,
+      "districtId": "mean-penhoet",
       "address": "Avenue de Penhouët",
-      "lat": null,
-      "lng": null,
-      "locationPrecision": "inconnue",
+      "lat": 47.2925,
+      "lng": -2.1905,
+      "locationPrecision": "quartier",
       "availableFrom": "2026-07-20",
       "publishedAt": null,
       "firstSeen": "2026-11-14",
