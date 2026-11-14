@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T18:09:49.603Z",
+  "generatedAt": "2026-11-14T18:12:23.988Z",
   "sources": [
     {
       "id": "alertes-email",
@@ -55,13 +55,12 @@
     "rejected": {
       "type": 15,
       "budget": 17,
-      "distance": 2,
-      "ville": 1
+      "distance": 3
     }
   },
   "listings": [
     {
-      "id": "fnaim-18-location-appartement-loire-atlantique-44",
+      "id": "fnaim-2j4wnx",
       "source": "fnaim",
       "sourceLabel": "FNAIM",
       "url": "https://www.fnaim.fr/annonce-immobiliere/53233236/18-location-appartement-loire-atlantique-44.htm",
@@ -90,7 +89,7 @@
       "collector": "fnaim"
     },
     {
-      "id": "fnaim-18-location-appartement-st-nazaire-44600",
+      "id": "fnaim-nlulh8",
       "source": "fnaim",
       "sourceLabel": "FNAIM",
       "url": "https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm",
@@ -120,18 +119,18 @@
       "collector": "fnaim"
     },
     {
-      "id": "fnaim-18-location-appartement-st-nazaire-44600",
+      "id": "fnaim-10n0qyj",
       "source": "fnaim",
       "sourceLabel": "FNAIM",
-      "url": "https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm",
-      "title": "Appartement 1 pièce 31m² ST NAZAIRE 44600",
-      "description": "Appartement 1 pièce 31m² ST NAZAIRE 44600\n545€\npar mois\nBalcon\nAscenseur\nÀ LOUER ! Découvrez cet appartement neuf T1 situé au cœur de Saint-Nazaire.\nAvec une superficie de 31 m², cet espace de vie est idéal pour les jeunes actifs ou les étudiants à la recherche d'un lieu confortable et pratique.\nVous apprécierez le conf...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
-      "type": "T1",
+      "url": "https://www.fnaim.fr/annonce-immobiliere/53234097/18-location-appartement-st-nazaire-44600.htm",
+      "title": "Appartement 2 pièces 44m² ST NAZAIRE 44600",
+      "description": "Appartement 2 pièces 44m² ST NAZAIRE 44600\n614€\npar mois\n1 chambre\nBalcon\nAscenseur\nParking / Garage\nÀ LOUER : Appartement T2 moderne situé à Saint-Nazaire. Avec une superficie de 44 m², cet appartement est idéal pour un couple ou une personne seule à la recherche de confort et de praticité.\nL'appartement se compose d'un espace de vie lumineux et...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
+      "type": "T2",
       "isShared": false,
-      "rent": 545,
+      "rent": 614,
       "chargesIncluded": false,
       "charges": null,
-      "surface": 31,
+      "surface": 44,
       "furnished": false,
       "city": "Saint-Nazaire",
       "postcode": "44600",
@@ -145,23 +144,24 @@
       "firstSeen": "2026-11-14",
       "features": [
         "Balcon",
-        "Ascenseur"
+        "Ascenseur",
+        "Stationnement"
       ],
       "collector": "fnaim"
     },
     {
-      "id": "fnaim-18-location-appartement-st-nazaire-44600",
+      "id": "fnaim-1q8d7z3",
       "source": "fnaim",
       "sourceLabel": "FNAIM",
-      "url": "https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm",
-      "title": "Appartement 1 pièce 31m² ST NAZAIRE 44600",
-      "description": "Appartement 1 pièce 31m² ST NAZAIRE 44600\n545€\npar mois\nBalcon\nAscenseur\nÀ LOUER ! Découvrez cet appartement neuf T1 situé au cœur de Saint-Nazaire.\nAvec une superficie de 31 m², cet espace de vie est idéal pour les jeunes actifs ou les étudiants à la recherche d'un lieu confortable et pratique.\nVous apprécierez le conf...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
-      "type": "T1",
+      "url": "https://www.fnaim.fr/annonce-immobiliere/53221543/18-location-appartement-st-nazaire-44600.htm",
+      "title": "Appartement 2 pièces 43m² ST NAZAIRE 44600",
+      "description": "Appartement 2 pièces 43m² ST NAZAIRE 44600\n618€\npar mois\n1 chambre\nTerrasse\nAscenseur\nÀ LOUER : Appartement T2 moderne situé à Saint-Nazaire. Avec une superficie de 43 m², cet appartement est idéal pour une personne seule ou un couple à la recherche d'un cadre de vie agréable.\nL'appartement se compose d'un espace de vie lumine...\n\n\n44600 ST NAZAIRE LOIRE-ATLANTIQUE PAYS-DE-LA-LOIRE",
+      "type": "T2",
       "isShared": false,
-      "rent": 545,
+      "rent": 618,
       "chargesIncluded": false,
       "charges": null,
-      "surface": 31,
+      "surface": 43,
       "furnished": false,
       "city": "Saint-Nazaire",
       "postcode": "44600",
@@ -174,7 +174,7 @@
       "publishedAt": null,
       "firstSeen": "2026-11-14",
       "features": [
-        "Balcon",
+        "Terrasse",
         "Ascenseur"
       ],
       "collector": "fnaim"
