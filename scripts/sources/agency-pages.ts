@@ -92,6 +92,7 @@ export function agencySource(site: AgencySite): ListingSource {
       const listings: RawListing[] = [];
       const max = site.maxDetails ?? 40;
       let skipped = 0;
+      let debugExcerpts = 0;
       for (const url of [...detailUrls].slice(0, max)) {
         // Une autre ville du même nom (Saint-Nazaire, 66) ou une ville voisine : inutile d'ouvrir la fiche.
         if (/\b(66\d{3}|saint-brevin|pornichet|la-baule|trignac|montoir)\b/i.test(url)) continue;
@@ -112,11 +113,16 @@ export function agencySource(site: AgencySite): ListingSource {
             console.log(
               `  [${site.id}] ${url}\n      → ${extracted.title.slice(0, 70)} | ${extracted.rent ?? '?'} € ${extracted.chargesMode ?? ''} | ${extracted.surface ?? '?'} m² | ${extracted.locationText} | ${extracted.address ?? ''}`,
             );
+            if (debugExcerpts < 3) {
+              debugExcerpts += 1;
+              console.log(`      texte : ${JSON.stringify(extracted.excerpt ?? '')}`);
+            }
           }
           if (raw) listings.push(raw);
           else skipped += 1;
         } catch (error) {
           if (error instanceof BlockedError) throw error;
+          if (debug) console.log(`  [${site.id}] ${url} : ${(error as Error).message}`);
           skipped += 1;
         }
       }

@@ -21,6 +21,8 @@ export interface Extracted {
   availabilityText: string | null;
   lat: number | null;
   lng: number | null;
+  /** Début du texte utile de la page, pour le mode --debug. */
+  excerpt?: string;
 }
 
 const asNumber = (value: unknown): number | null => {
@@ -209,6 +211,7 @@ export function extractFromHtml(html: string): Extracted {
       : chargesFrom(main.slice(0, 1500));
 
   return {
+    excerpt: main.slice(0, 1800),
     title,
     description,
     rent,
