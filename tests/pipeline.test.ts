@@ -321,3 +321,72 @@ test('géocodage : la rue trouvée doit correspondre à la rue demandée', async
   assert.equal(sameStreet('Avenue de Penhouët', 'Avenue de Saint-Nazaire'), false);
   assert.equal(sameStreet('98 AVENUE ALBERT DE MUN', 'Avenue Albert de Mun'), true);
 });
+
+test('chiffrement : aller-retour, et mauvaise phrase refusée', async () => {
+  const { encryptJson, decryptJson, isEncryptedFile, WrongPassphraseError } = await import('../src/lib/crypto');
+  const payload = { listings: [{ id: 'a', rent: 520 }], generatedAt: '2026-11-14T07:17:00Z' };
+  const sealed = await encryptJson(payload, 'phrase de test très longue');
+  assert.ok(isEncryptedFile(sealed));
+  assert.ok(!JSON.stringify(sealed).includes('520'));
+  assert.deepEqual(await decryptJson(sealed, 'phrase de test très longue'), payload);
+  await assert.rejects(decryptJson(sealed, 'mauvaise phrase'), WrongPassphraseError);
+});
+
+test('Apify : résultat Leboncoin converti', async () => {
+  const { toRawListing, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const portal = APIFY_PORTALS.find((p) => p.id === 'leboncoin')!;
+  const raw = toRawListing(
+    {
+      id: '3127779306',
+      url: 'https://www.leboncoin.fr/ad/locations/3127779306',
+      subject: 'Appartement lumineux proche gare',
+      body: 'Au 2e étage, rue de la Paix. Disponible début janvier 2027.',
+      price: [560],
+      first_publication_date: '2026-11-13 18:50:46',
+      attributes: [
+        { key: 'square', value: '38', value_label: '38 m²' },
+        { key: 'rooms', value: '2', value_label: '2' },
+        { key: 'charges_included', value: '1', value_label: 'Oui' },
+        { key: 'furnished', value: '2', value_label: 'Non meublé' },
+      ],
+      location: { city: 'Saint-Nazaire', zipcode: '44600', lat: 47.27, lng: -2.21, source: 'city' },
+    },
+    portal,
+  )!;
+  assert.equal(raw.priceText, '560 € CC');
+  assert.equal(raw.surfaceText, '38 m²');
+  assert.equal(raw.publishedAt, '2026-11-13');
+  assert.equal(raw.lat, undefined, 'position floutée ignorée');
+  assert.equal(raw.furnished, false);
+  const listing = normalizeListing(raw, TODAY)!;
+  assert.equal(listing.type, 'T2');
+  assert.equal(listing.postcode, '44600');
+  assert.equal(evaluate(listing).accepted, true);
+});
+
+test('Apify : résultat Bien’ici converti, lien étranger refusé', async () => {
+  const { toRawListing, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const portal = APIFY_PORTALS.find((p) => p.id === 'bienici')!;
+  const item = {
+    id: 'ag440871-5521',
+    propertyType: 'flat',
+    title: 'Appartement',
+    description: 'Studio meublé face à la mer.',
+    price: 535,
+    charges: 30,
+    surfaceArea: 24,
+    roomsQuantity: 1,
+    url: 'https://www.bienici.com/annonce/location/saint-nazaire/appartement/1piece/ag440871-5521',
+    city: 'Saint-Nazaire',
+    postalCode: '44600',
+    district: { name: 'Front de mer' },
+    blurInfo: { position: { lat: 47.27, lon: -2.21 } },
+  };
+  const raw = toRawListing(item, portal)!;
+  assert.equal(raw.priceText, '535 € + 30 € de charges');
+  const listing = normalizeListing(raw, TODAY)!;
+  assert.equal(listing.type, 'T1');
+  assert.equal(listing.districtId, 'front-de-mer');
+  assert.equal(toRawListing({ ...item, url: 'https://ailleurs.example/annonce/1' }, portal), null);
+  assert.equal(toRawListing({ ...item, price: null }, portal), null);
+});

@@ -32,6 +32,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { ListingCard } from './ListingCard';
 import { ListingDrawer } from './ListingDrawer';
 import { ListingsTable } from './ListingsTable';
+import { UnlockScreen } from './UnlockScreen';
 
 interface Prefs {
   tab: Tab;
@@ -67,7 +68,7 @@ export function Dashboard() {
   const [prefs, setPrefs] = useStoredState<Prefs>(STORAGE_KEYS.prefs, DEFAULT_PREFS, revivePrefs);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const file = useListingsFile();
+  const { state: file, unlock } = useListingsFile();
 
   const collected = useMemo(
     () => (file.status === 'ready' ? file.data.listings.map((listing) => evaluate(listing)) : []),
@@ -156,7 +157,9 @@ export function Dashboard() {
       />
 
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 sm:px-6">
-        {prefs.tab === 'annonces' ? (
+        {file.status === 'locked' ? (
+          <UnlockScreen error={file.error} unlocking={file.unlocking} onUnlock={unlock} />
+        ) : prefs.tab === 'annonces' ? (
           <>
             <Brief
               accepted={accepted.length}
@@ -185,7 +188,7 @@ export function Dashboard() {
                 <div className="rounded-md border border-dashed border-line px-6 py-12 text-center">
                   <p className="font-medium">Les annonces n’ont pas pu être chargées.</p>
                   <p className="mt-1 text-sm text-muted">
-                    Le fichier listings.json est introuvable ({file.message}). Rechargez la page ;
+                    Le fichier des annonces est introuvable ({file.message}). Rechargez la page ;
                     si le problème persiste, relancez la collecte depuis l’onglet Actions du dépôt.
                   </p>
                 </div>

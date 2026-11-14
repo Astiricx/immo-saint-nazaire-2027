@@ -1,6 +1,7 @@
 import { extractFromHtml, extractFromText, toRawListing } from '../lib/extract';
 import { extractLinks, segmentByLinks } from '../lib/html';
 import { BlockedError, fetchPage, robotsAllows } from '../lib/http';
+import { canLogContent } from '../lib/privacy';
 import type { RawListing } from '../../src/lib/types';
 import type { ListingSource } from './types';
 
@@ -45,6 +46,12 @@ export const AGENCY_SITES: AgencySite[] = [
     detailPattern: /\/annonce-immobiliere\/\d+\//i,
   },
   {
+    id: 'ouestfrance-immo',
+    label: 'Ouest-France Immo',
+    searchUrls: ['https://www.ouestfrance-immo.com/louer/appartement/saint-nazaire-44-44184/'],
+    detailPattern: /\/immobilier\/location\/[^?#]*\d{6,}|\/annonce[^?#]*\d{6,}/i,
+  },
+  {
     id: 'laforet',
     label: 'Laforêt',
     searchUrls: ['https://www.laforet.com/ville/location-appartement-saint-nazaire-44600'],
@@ -63,6 +70,7 @@ export function agencySource(site: AgencySite): ListingSource {
     label: site.label,
     disabledReason: () => null,
     async fetch(debug) {
+      const showContent = canLogContent(debug);
       const detailUrls = new Set<string>();
       /** Texte de la carte d'annonce sur la page de résultats, par lien de fiche. */
       const cards = new Map<string, string>();
@@ -108,7 +116,7 @@ export function agencySource(site: AgencySite): ListingSource {
         const card = cards.get(url);
         if (!card) return null;
         const extracted = extractFromText(card);
-        if (debug) {
+        if (showContent) {
           console.log(
             `  [${site.id}] carte ${url}\n      → ${extracted.title.slice(0, 70)} | ${extracted.rent ?? '?'} € ${extracted.chargesMode ?? ''} | ${extracted.surface ?? '?'} m² | ${extracted.locationText}`,
           );
@@ -131,7 +139,7 @@ export function agencySource(site: AgencySite): ListingSource {
             const html = await fetchPage(url);
             const extracted = extractFromHtml(html);
             raw = toRawListing(extracted, meta(url));
-            if (debug) {
+            if (showContent) {
               console.log(
                 `  [${site.id}] ${url}\n      → ${extracted.title.slice(0, 70)} | ${extracted.rent ?? '?'} € ${extracted.chargesMode ?? ''} | ${extracted.surface ?? '?'} m² | ${extracted.locationText} | ${extracted.address ?? ''}`,
               );
@@ -142,7 +150,7 @@ export function agencySource(site: AgencySite): ListingSource {
             }
           } catch (error) {
             if (error instanceof BlockedError) throw error;
-            if (debug) console.log(`  [${site.id}] ${url} : ${(error as Error).message}`);
+            if (showContent) console.log(`  [${site.id}] ${url} : ${(error as Error).message}`);
           }
         }
         if (!raw) {

@@ -36,6 +36,11 @@ jobs:
       - name: Collecter les annonces
         run: npm run collect
         env:
+          # Grands portails (Leboncoin, SeLoger, Bien'ici) via Apify : les deux secrets sont nécessaires.
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          APIFY_MAX_ITEMS: ${{ vars.APIFY_MAX_ITEMS }}
+          # Phrase secrète : les annonces sont publiées chiffrées et les journaux restent muets.
+          LISTINGS_PASSPHRASE: ${{ secrets.LISTINGS_PASSPHRASE }}
           # Facultatif : alertes e-mail des portails (voir le README).
           IMAP_USER: ${{ secrets.IMAP_USER }}
           IMAP_PASSWORD: ${{ secrets.IMAP_PASSWORD }}
@@ -45,15 +50,16 @@ jobs:
           FEED_URLS: ${{ vars.FEED_URLS }}
           COLLECT_DEBUG: ${{ inputs.debug && '1' || '' }}
 
-      - name: Enregistrer public/listings.json dans le dépôt
+      - name: Enregistrer les annonces dans le dépôt
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/listings.json
+          # listings.enc.json (chiffré) ou listings.json (en clair) ; l'autre est supprimé.
+          git add -A public/
           if git diff --cached --quiet; then
             echo "Aucun changement."
           else
-            git commit -m "Collecte du $(date -u +%Y-%m-%d) : $(node -p "require('./public/listings.json').listings.length") annonce(s) retenue(s)"
+            git commit -m "Collecte du $(date -u +%Y-%m-%d)"
             git pull --rebase --autostash origin main
             git push origin HEAD:main
           fi

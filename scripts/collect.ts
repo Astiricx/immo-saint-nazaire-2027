@@ -1,16 +1,19 @@
 /**
  * Collecte réelle des annonces, lancée chaque jour par .github/workflows/scrape.yml.
  *
- *   npm run collect            collecte complète, écrit public/listings.json
+ *   npm run collect            collecte complète
  *   npm run collect -- --debug détaille chaque page lue (pour régler une source)
  *
  * Étapes : sources → normalisation → géocodage des adresses → dédoublonnage
- * → filtrage strict (src/lib/evaluate.ts) → public/listings.json.
- * Seules les annonces conformes aux critères sont publiées.
+ * → filtrage strict (src/lib/evaluate.ts) → publication.
+ * Seules les annonces conformes aux critères sont publiées :
+ *   - avec le secret LISTINGS_PASSPHRASE : public/listings.enc.json, chiffré (portails inclus) ;
+ *   - sans : public/listings.json, en clair, sans les portails (Leboncoin, SeLoger, Bien'ici).
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { CRITERIA } from '../src/lib/criteria';
+import { decryptJson, encryptJson, isEncryptedFile } from '../src/lib/crypto';
 import { evaluate } from '../src/lib/evaluate';
 import { euro } from '../src/lib/format';
 import { dedupe, normalizeListing, withCoordinates } from '../src/lib/normalize';
@@ -21,16 +24,21 @@ import type {
   SourceReport,
 } from '../src/lib/types';
 import { BlockedError, geocode } from './lib/http';
+import { PASSPHRASE, PRIVATE_MODE, canLogContent } from './lib/privacy';
+import { APIFY_PORTALS, apifySource } from './sources/apify';
 import { AGENCY_SITES, agencySource } from './sources/agency-pages';
 import { emailAlertsSource } from './sources/email-alerts';
 import { jsonFeedSource } from './sources/json-feed';
 import type { ListingSource } from './sources/types';
 
-const OUTPUT = resolve(process.cwd(), 'public/listings.json');
+const PLAIN_OUTPUT = resolve(process.cwd(), 'public/listings.json');
+const ENCRYPTED_OUTPUT = resolve(process.cwd(), 'public/listings.enc.json');
 const DEBUG = process.argv.includes('--debug') || process.env.COLLECT_DEBUG === '1';
+const LOG_CONTENT = canLogContent(DEBUG);
 const MAX_GEOCODES = 80;
 
 const SOURCES: ListingSource[] = [
+  ...APIFY_PORTALS.map(apifySource),
   emailAlertsSource,
   ...AGENCY_SITES.map(agencySource),
   jsonFeedSource,
@@ -44,19 +52,28 @@ const REASON_LABELS: Record<RejectionCode, string> = {
   ville: 'hors Saint-Nazaire',
 };
 
-function readPrevious(): ListingsFile | null {
-  if (!existsSync(OUTPUT)) return null;
+async function readPrevious(): Promise<ListingsFile | null> {
   try {
-    return JSON.parse(readFileSync(OUTPUT, 'utf8')) as ListingsFile;
+    if (PRIVATE_MODE && existsSync(ENCRYPTED_OUTPUT)) {
+      const payload: unknown = JSON.parse(readFileSync(ENCRYPTED_OUTPUT, 'utf8'));
+      return isEncryptedFile(payload) ? await decryptJson<ListingsFile>(payload, PASSPHRASE) : null;
+    }
+    if (existsSync(PLAIN_OUTPUT)) return JSON.parse(readFileSync(PLAIN_OUTPUT, 'utf8')) as ListingsFile;
   } catch {
-    return null;
+    // Fichier illisible ou phrase secrète changée : on repart de zéro.
   }
+  return null;
 }
 
 async function main() {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const previous = readPrevious();
+  const previous = await readPrevious();
+  console.log(
+    PRIVATE_MODE
+      ? 'Mode privé : annonces publiées chiffrées, aucun contenu dans ce journal.'
+      : 'Mode public : annonces publiées en clair ; portails désactivés (secret LISTINGS_PASSPHRASE absent).',
+  );
   const reports: SourceReport[] = [];
   const collected: Listing[] = [];
   let unreadable = 0;
@@ -113,7 +130,7 @@ async function main() {
     geocoded += 1;
     const point = await geocode(listing.address);
     if (point) collected[i] = withCoordinates(listing, point.lat, point.lng);
-    if (DEBUG) {
+    if (LOG_CONTENT) {
       const trip = point ? evaluate(collected[i]).bikeMinutes : null;
       console.log(
         `  géocodage « ${listing.address} » → ${point ? `${point.lat}, ${point.lng} (${collected[i].districtId ?? 'hors quartier connu'}, ${trip} min)` : 'non trouvé'}`,
@@ -124,7 +141,7 @@ async function main() {
   const { unique, removed } = dedupe(collected);
   const evaluated = unique.map((listing) => evaluate(listing));
   const accepted = evaluated.filter((l) => l.accepted);
-  if (DEBUG) {
+  if (LOG_CONTENT) {
     for (const l of evaluated) {
       console.log(
         `  ${l.accepted ? 'RETENUE ' : 'écartée '} ${l.sourceLabel} | ${l.title.slice(0, 60)} | ${l.monthlyCost} € | ${l.bikeMinutes ?? '?'} min | ${l.rejections.map((r) => r.code).join(', ')}`,
@@ -167,8 +184,18 @@ async function main() {
     },
     listings: keptListings,
   };
-  mkdirSync(dirname(OUTPUT), { recursive: true });
-  writeFileSync(OUTPUT, `${JSON.stringify(file, null, 2)}\n`, 'utf8');
+  mkdirSync(dirname(PLAIN_OUTPUT), { recursive: true });
+  let output: string;
+  if (PRIVATE_MODE) {
+    output = ENCRYPTED_OUTPUT;
+    writeFileSync(ENCRYPTED_OUTPUT, `${JSON.stringify(await encryptJson(file, PASSPHRASE))}\n`, 'utf8');
+    // Jamais de version en clair à côté de la version chiffrée.
+    rmSync(PLAIN_OUTPUT, { force: true });
+  } else {
+    output = PLAIN_OUTPUT;
+    writeFileSync(PLAIN_OUTPUT, `${JSON.stringify(file, null, 2)}\n`, 'utf8');
+    rmSync(ENCRYPTED_OUTPUT, { force: true });
+  }
 
   const rejectedTotal = evaluated.length - accepted.length;
   const lines = [
@@ -183,7 +210,7 @@ async function main() {
     }.`,
     `${geocoded} adresse(s) géocodée(s).`,
   ];
-  console.log(`\n${lines.join('\n')}\nFichier écrit : ${OUTPUT}`);
+  console.log(`\n${lines.join('\n')}\nFichier écrit : ${output}`);
 
   // Résumé affiché sur la page de l'exécution dans l'onglet Actions.
   if (process.env.GITHUB_STEP_SUMMARY) {

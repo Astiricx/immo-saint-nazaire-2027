@@ -2,7 +2,7 @@
 
 Tableau de bord pour trouver un **studio ou un T2 à Saint-Nazaire**, à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
 
-Chaque matin, une GitHub Action collecte les annonces de location, écarte celles qui sortent des critères, enregistre le résultat dans `public/listings.json` et republie le site. Le site lit ce fichier à chaque visite.
+Chaque matin, une GitHub Action collecte les annonces de location (grands portails, agences, alertes e-mail), écarte celles qui sortent des critères, publie le résultat **chiffré** dans `public/listings.enc.json` et republie le site. Le site déchiffre ce fichier avec votre phrase secrète.
 
 Site : <https://astiricx.github.io/immo-saint-nazaire-2027/>
 
@@ -24,33 +24,53 @@ Les seuils se règlent dans [`src/lib/criteria.ts`](src/lib/criteria.ts).
 
 | Source | Fonctionnement | Activation |
 | --- | --- | --- |
-| Alertes e-mail des portails | Lit, en lecture seule, les e-mails d'alerte de Leboncoin, SeLoger, Bien'ici, PAP, Logic-Immo, Ouest-France Immo, ParuVendu, LocService et Jinka reçus ces 4 derniers jours. | Secrets `IMAP_USER` et `IMAP_PASSWORD` |
-| Sites d'agences | Square Habitat, Foncia, FNAIM, Laforêt : page de résultats Saint-Nazaire, puis chaque fiche. | Active par défaut |
+| Leboncoin, SeLoger, Bien'ici | Via des Actors [Apify](https://apify.com), qui passent les protections anti-robots avec des proxys résidentiels français. Payé au résultat. | Secrets `APIFY_TOKEN` **et** `LISTINGS_PASSPHRASE` |
+| Alertes e-mail des portails | Lit, en lecture seule, les alertes de Leboncoin, SeLoger, Bien'ici, PAP, Logic-Immo, Ouest-France Immo, ParuVendu, LocService et Jinka reçues ces 4 derniers jours. | Secrets `IMAP_USER` et `IMAP_PASSWORD` |
+| Sites d'agences et Ouest-France Immo | Square Habitat, Foncia, FNAIM, Laforêt, Ouest-France Immo : page de résultats Saint-Nazaire, puis chaque fiche, en respectant `robots.txt`. | Active par défaut |
 | Flux JSON | Toute adresse qui renvoie un tableau d'annonces au format de [`json-feed.ts`](scripts/sources/json-feed.ts). | Variable `FEED_URLS` |
-
-Le collecteur s'identifie clairement, attend 2 secondes entre deux pages d'un même site, et ne visite que les pages que le fichier `robots.txt` du site autorise. Un site qui refuse est marqué « Accès refusé » dans le bilan, sans contournement.
-
-Leboncoin et SeLoger ne sont pas lus directement : leurs conditions d'utilisation interdisent l'extraction automatique, et ils la bloquent. Leurs **alertes e-mail** sont la voie prévue pour les suivre.
 
 Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion) est affiché en bas du site et sur la page de l'exécution, dans l'onglet *Actions*.
 
-### Activer les alertes e-mail (recommandé)
+### Activer les grands portails
 
-1. Sur Leboncoin, SeLoger, Bien'ici ou PAP, lancez une recherche « location, Saint-Nazaire, appartement, 700 € max » et créez une alerte e-mail quotidienne.
+1. **Phrase secrète.** Choisissez une longue phrase (5 mots ou plus). Dans le dépôt : *Settings > Secrets and variables > Actions > New repository secret*, nom `LISTINGS_PASSPHRASE`. Gardez-la : le site vous la demandera une fois par appareil.
+2. **Compte Apify.** Créez un compte gratuit sur <https://console.apify.com/sign-up> (sans carte bancaire), puis copiez votre jeton dans *Settings > API & Integrations*.
+3. **Jeton.** Ajoutez le secret `APIFY_TOKEN` de la même façon.
+4. Lancez la collecte : *Actions > Collecte quotidienne des annonces > Run workflow*.
+
+Chaque portail renvoie au plus 60 annonces par jour (variable `APIFY_MAX_ITEMS` pour changer). Les Actors sont payés au résultat, autour d'un dollar pour mille annonces, plus le trafic des proxys résidentiels ; le crédit gratuit mensuel d'Apify couvre normalement ce volume. Votre consommation est visible dans la console Apify, qui bloque au lieu de facturer quand le crédit gratuit est épuisé.
+
+Les Actors utilisés sont listés dans [`scripts/sources/apify.ts`](scripts/sources/apify.ts) : si l'un d'eux disparaît ou se dégrade, remplacez son `actorId` et son `input`. La conversion des résultats accepte les noms de champs courants.
+
+### Pourquoi les annonces sont chiffrées
+
+Un site GitHub Pages est public, même si le dépôt est privé. Les conditions d'utilisation de Leboncoin interdisent les robots, et republier publiquement des annonces extraites de Leboncoin ou SeLoger a valu à Jinka une condamnation en appel en avril 2026. Ici, les annonces restent lisibles par vous seul :
+
+- `public/listings.enc.json` est chiffré (AES-256-GCM, clé dérivée de la phrase secrète par PBKDF2) ;
+- aucune version en clair n'est jamais enregistrée dans le dépôt ;
+- les journaux de l'Action, publics sur un dépôt public, ne contiennent que des comptes et des noms de champs.
+
+Sans le secret `LISTINGS_PASSPHRASE`, les portails restent désactivés et le site publie en clair les seules annonces des agences, des alertes et des flux.
+
+Ce dispositif réduit le risque, il ne le supprime pas : la collecte automatisée de Leboncoin reste contraire à ses conditions d'utilisation. C'est votre choix, pour votre recherche personnelle.
+
+### Activer les alertes e-mail
+
+1. Sur les portails, lancez une recherche « location, Saint-Nazaire, appartement, 700 € max » et créez une alerte e-mail quotidienne.
 2. Créez un mot de passe d'application Gmail : *Compte Google > Sécurité > Validation en deux étapes > Mots de passe des applications*.
-3. Dans le dépôt : *Settings > Secrets and variables > Actions > New repository secret*, ajoutez `IMAP_USER` (votre adresse Gmail) et `IMAP_PASSWORD` (le mot de passe d'application).
+3. Ajoutez les secrets `IMAP_USER` (votre adresse Gmail) et `IMAP_PASSWORD` (le mot de passe d'application). Pour une autre messagerie, ajoutez aussi `IMAP_HOST`.
 
-Pour une autre messagerie, ajoutez aussi `IMAP_HOST`. Le mot de passe reste chiffré dans GitHub et n'apparaît jamais dans les journaux. La boîte est ouverte en lecture seule.
+La boîte est ouverte en lecture seule. Les liens de suivi des e-mails sont remplacés par l'adresse neutre de l'annonce.
 
 ## La GitHub Action
 
 [`.github/workflows/scrape.yml`](.github/workflows/scrape.yml) tourne tous les jours à 7 h 17 UTC (8 h 17 à Saint-Nazaire en hiver) :
 
 1. collecte et filtre les annonces (`npm run collect`) ;
-2. enregistre `public/listings.json` dans le dépôt ;
+2. enregistre `public/listings.enc.json` (ou `public/listings.json` sans phrase secrète) dans le dépôt ;
 3. appelle [`ci.yml`](.github/workflows/ci.yml), qui teste, construit et publie le site sur GitHub Pages.
 
-Pour lancer une collecte tout de suite : *Actions > Collecte quotidienne des annonces > Run workflow*. Cochez « Détailler chaque page lue » pour voir dans le journal ce que le collecteur trouve sur chaque fiche.
+Pour lancer une collecte tout de suite : *Actions > Collecte quotidienne des annonces > Run workflow*. L'option « Détailler chaque page lue » ajoute au journal des comptes par page et, pour Apify, les noms de champs reçus ; le contenu des annonces n'y figure qu'en l'absence de phrase secrète.
 
 GitHub suspend les tâches planifiées d'un dépôt resté 60 jours sans activité ; les commits quotidiens de la collecte suffisent à l'éviter.
 
@@ -71,7 +91,7 @@ Node.js 20.9 ou plus récent.
 | --- | --- |
 | `npm install` | Installe les dépendances |
 | `npm run dev` | Serveur de développement sur <http://localhost:3000> |
-| `npm run collect` | Collecte réelle, écrit `public/listings.json` |
+| `npm run collect` | Collecte réelle, écrit `public/listings.enc.json` ou `public/listings.json` |
 | `npm run collect -- --debug` | Idem, en détaillant chaque page lue |
 | `npm test` | Tests de l'extraction, du filtrage et du score |
 | `npm run build` | Vérification des types et export statique dans `out/` |
@@ -94,11 +114,11 @@ Quand une annonce donne une rue, elle est géocodée par le service public de la
 .github/workflows/
   scrape.yml           Collecte quotidienne, commit, publication
   ci.yml               Tests, build, déploiement GitHub Pages
-public/listings.json   Annonces retenues par la dernière collecte
+public/listings.enc.json  Annonces retenues, chiffrées
 scripts/
   collect.ts           Orchestration de la collecte
   lib/                 robots.txt, requêtes, extraction HTML, géocodage
-  sources/             Alertes e-mail, sites d'agences, flux JSON
+  sources/             Portails via Apify, alertes e-mail, sites d'agences, flux JSON
 src/
   app/                 Page et styles (Next.js, export statique)
   components/          Tableau de bord, cartes, tableau, Kanban, fiche
@@ -108,4 +128,4 @@ tests/                 Tests sans réseau
 
 ## Données personnelles
 
-Le suivi (étapes, notes, annonces ajoutées) reste dans votre navigateur. `public/listings.json` ne contient que les annonces publiques collectées, jamais vos e-mails.
+Le suivi (étapes, notes, annonces ajoutées) reste dans votre navigateur, comme la phrase secrète si vous cochez « Se souvenir sur cet appareil ». Le fichier publié ne contient que les annonces collectées, jamais vos e-mails.
