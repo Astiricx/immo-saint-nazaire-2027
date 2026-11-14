@@ -1,7 +1,8 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import rawData from '@/data/listings.json';
+import { useListingsFile } from '@/lib/data';
 import { evaluate } from '@/lib/evaluate';
 import {
   DEFAULT_FILTERS,
@@ -20,9 +21,10 @@ import {
   type TrackEntry,
   type TrackerState,
 } from '@/lib/storage';
-import type { EvaluatedListing, Listing, ListingsFile, StatusId } from '@/lib/types';
+import type { Listing, StatusId } from '@/lib/types';
 import { AddListingDialog } from './AddListingDialog';
 import { Brief } from './Brief';
+import { CollectionStatus } from './CollectionStatus';
 import { FiltersBar, type View } from './FiltersBar';
 import { Footer } from './Footer';
 import { Header, type Tab } from './Header';
@@ -30,18 +32,12 @@ import { KanbanBoard } from './KanbanBoard';
 import { ListingCard } from './ListingCard';
 import { ListingDrawer } from './ListingDrawer';
 import { ListingsTable } from './ListingsTable';
-import { RejectedPanel } from './RejectedPanel';
-
-const DATA = rawData as unknown as ListingsFile;
-/** Les annonces collectées par le script, évaluées une fois pour toutes. */
-const COLLECTED: EvaluatedListing[] = DATA.listings.map((listing) => evaluate(listing));
 
 interface Prefs {
   tab: Tab;
   view: View;
   sort: SortKey;
   filters: Filters;
-  demoNoticeDismissed: boolean;
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -49,15 +45,15 @@ const DEFAULT_PREFS: Prefs = {
   view: 'grid',
   sort: 'score',
   filters: DEFAULT_FILTERS,
-  demoNoticeDismissed: false,
 };
 
 function revivePrefs(value: unknown): Prefs {
   if (!value || typeof value !== 'object') return DEFAULT_PREFS;
   const input = value as Partial<Prefs>;
   return {
-    ...DEFAULT_PREFS,
-    ...input,
+    tab: input.tab === 'suivi' ? 'suivi' : 'annonces',
+    view: input.view === 'table' ? 'table' : 'grid',
+    sort: input.sort ?? DEFAULT_PREFS.sort,
     filters: { ...DEFAULT_FILTERS, ...(input.filters ?? {}) },
   };
 }
@@ -71,13 +67,18 @@ export function Dashboard() {
   const [prefs, setPrefs] = useStoredState<Prefs>(STORAGE_KEYS.prefs, DEFAULT_PREFS, revivePrefs);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const file = useListingsFile();
 
-  const all = useMemo(
-    () => [...tracker.custom.map((listing) => evaluate(listing)), ...COLLECTED],
-    [tracker.custom],
+  const collected = useMemo(
+    () => (file.status === 'ready' ? file.data.listings.map((listing) => evaluate(listing)) : []),
+    [file],
   );
+  const all = useMemo(
+    () => [...tracker.custom.map((listing) => evaluate(listing)), ...collected],
+    [tracker.custom, collected],
+  );
+  // Le collecteur ne publie que des annonces conformes ; les ajouts manuels sont filtrés ici.
   const accepted = useMemo(() => all.filter((l) => l.accepted), [all]);
-  const rejected = useMemo(() => all.filter((l) => !l.accepted), [all]);
 
   const entryOf = useCallback(
     (id: string): TrackEntry => tracker.entries[id] ?? DEFAULT_ENTRY,
@@ -142,7 +143,7 @@ export function Dashboard() {
   const selected = selectedId ? (all.find((l) => l.id === selectedId) ?? null) : null;
   const closeDrawer = useCallback(() => setSelectedId(null), []);
   const closeDialog = useCallback(() => setAdding(false), []);
-  const hasDemo = all.some((l) => l.isDemo);
+  const data = file.status === 'ready' ? file.data : null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -159,14 +160,8 @@ export function Dashboard() {
           <>
             <Brief
               accepted={accepted.length}
-              collected={all.length}
-              rejected={rejected.length}
               idealCount={idealCount}
-              generatedAt={DATA.generatedAt}
-              showDemoNotice={hasDemo && !prefs.demoNoticeDismissed}
-              onDismissDemoNotice={() =>
-                setPrefs((previous) => ({ ...previous, demoNoticeDismissed: true }))
-              }
+              data={data}
             />
 
             <FiltersBar
@@ -181,7 +176,35 @@ export function Dashboard() {
             />
 
             <div className="mt-4">
-              {visible.length === 0 ? (
+              {file.status === 'loading' ? (
+                <p className="flex items-center gap-2 py-12 text-muted" role="status">
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Chargement des annonces
+                </p>
+              ) : file.status === 'error' && all.length === 0 ? (
+                <div className="rounded-md border border-dashed border-line px-6 py-12 text-center">
+                  <p className="font-medium">Les annonces n’ont pas pu être chargées.</p>
+                  <p className="mt-1 text-sm text-muted">
+                    Le fichier listings.json est introuvable ({file.message}). Rechargez la page ;
+                    si le problème persiste, relancez la collecte depuis l’onglet Actions du dépôt.
+                  </p>
+                </div>
+              ) : accepted.length === 0 ? (
+                <div className="rounded-md border border-dashed border-line px-6 py-12 text-center">
+                  <p className="font-medium">
+                    {data?.generatedAt
+                      ? 'Aucune annonce ne respecte vos critères pour le moment.'
+                      : 'La première collecte n’a pas encore eu lieu.'}
+                  </p>
+                  <p className="mx-auto mt-1 max-w-xl text-sm text-muted">
+                    La collecte repasse chaque matin. En attendant, ajoutez une annonce repérée
+                    ailleurs : elle sera notée et suivie comme les autres.
+                  </p>
+                  <button type="button" className="btn btn-primary mt-4" onClick={() => setAdding(true)}>
+                    Ajouter une annonce
+                  </button>
+                </div>
+              ) : visible.length === 0 ? (
                 <div className="rounded-md border border-dashed border-line px-6 py-12 text-center">
                   <p className="font-medium">Aucune annonce ne correspond à ces filtres.</p>
                   <p className="mt-1 text-sm text-muted">
@@ -221,11 +244,7 @@ export function Dashboard() {
               )}
             </div>
 
-            <RejectedPanel
-              rejected={rejected}
-              duplicatesRemoved={DATA.duplicatesRemoved}
-              onOpen={setSelectedId}
-            />
+            {data ? <CollectionStatus data={data} /> : null}
           </>
         ) : (
           <>

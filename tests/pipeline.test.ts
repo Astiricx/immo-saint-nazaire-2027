@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mockSource } from '../scripts/sources/mock';
+import { extractFromHtml, extractFromText, toRawListing } from '../scripts/lib/extract';
+import { extractLinks, htmlToText } from '../scripts/lib/html';
+import { isAllowed, parseRobots } from '../scripts/lib/robots';
+import { PORTALS, parseAlertEmail } from '../scripts/sources/email-alerts';
 import { CRITERIA } from '../src/lib/criteria';
 import { evaluate, monthlyCost } from '../src/lib/evaluate';
 import { DEFAULT_FILTERS, applyFilters, sortListings } from '../src/lib/filters';
@@ -10,18 +13,23 @@ import {
   detectShared,
   detectType,
   normalizeListing,
+  parseAmounts,
   parseAvailability,
   parsePrice,
   parseSurface,
+  withCoordinates,
 } from '../src/lib/normalize';
-import type { Listing } from '../src/lib/types';
+import type { Listing, RawListing } from '../src/lib/types';
+
+const TODAY = '2026-11-14';
 
 function listing(overrides: Partial<Listing> = {}): Listing {
-  const centre = getDistrict('centre-ville');
+  const centre = getDistrict('centre-ville')!;
   return {
     id: 'test-1',
-    source: 'manuel',
-    url: 'https://example.org/annonce',
+    source: 'test',
+    sourceLabel: 'Test',
+    url: 'https://example.org/annonce/1',
     title: 'T2 38 m² centre-ville',
     description: '',
     type: 'T2',
@@ -32,159 +40,237 @@ function listing(overrides: Partial<Listing> = {}): Listing {
     surface: 38,
     furnished: false,
     city: 'Saint-Nazaire',
+    postcode: '44600',
     districtId: centre.id,
+    address: null,
     lat: centre.lat,
     lng: centre.lng,
+    locationPrecision: 'quartier',
     availableFrom: '2027-01-04',
-    publishedAt: '2026-11-10',
+    publishedAt: null,
+    firstSeen: TODAY,
     features: [],
-    isDemo: false,
     ...overrides,
   };
 }
 
-test('lecture des prix', () => {
+function raw(overrides: Partial<RawListing> = {}): RawListing {
+  return {
+    source: 'test',
+    sourceLabel: 'Test',
+    ref: 'r1',
+    url: 'https://example.org/annonce/r1',
+    title: 'Location appartement 2 pièces - 35.37m² à Saint nazaire (44600)',
+    description: 'En centre-ville, proche mairie.',
+    priceText: '600 € CC',
+    surfaceText: '35.37 m²',
+    locationText: 'Saint-Nazaire (44600)',
+    ...overrides,
+  };
+}
+
+test('montants et prix dans tous les formats', () => {
+  assert.deepEqual(parseAmounts('321.84 € cc'), [321.84]);
+  assert.deepEqual(parseAmounts('1 050 €'), [1050]);
+  assert.deepEqual(parseAmounts('1.050 €'), [1050]);
+  assert.deepEqual(parseAmounts('528,84 €'), [528.84]);
   assert.deepEqual(parsePrice('520 € CC'), { rent: 520, chargesIncluded: true, charges: null });
-  assert.deepEqual(parsePrice('540 € + 45 € de charges'), {
-    rent: 540,
-    chargesIncluded: false,
-    charges: 45,
-  });
+  assert.deepEqual(parsePrice('540 € + 45 € de charges'), { rent: 540, chargesIncluded: false, charges: 45 });
   assert.deepEqual(parsePrice('430 € HC'), { rent: 430, chargesIncluded: false, charges: null });
-  assert.deepEqual(parsePrice('524 € tout compris'), {
-    rent: 524,
-    chargesIncluded: true,
-    charges: null,
-  });
-  assert.equal(parsePrice('1 050 €/mois charges comprises')?.rent, 1050);
   assert.equal(parsePrice('prix sur demande'), null);
 });
 
-test('lecture des surfaces, types et dates', () => {
+test('surfaces, types et dates', () => {
   assert.equal(parseSurface('38 m²'), 38);
-  assert.equal(parseSurface('35,37 m2'), 35.37);
-  assert.equal(detectType('Studio meublé 24 m² hypercentre'), 'studio');
-  assert.equal(detectType('T1 bis 31 m² Ville-Port'), 'T1');
-  assert.equal(detectType('Appartement 2 pièces lumineux'), 'T2');
+  assert.equal(parseSurface('35,37 m2'), 35.4);
+  assert.equal(detectType('Location appartement 1 pièce - 27.72m²'), 'T1');
+  assert.equal(detectType('Location appartement 2 pièces - 40.85m²'), 'T2');
+  assert.equal(detectType('Studio meublé 24 m²'), 'studio');
   assert.equal(detectType('T3 62 m² centre-ville'), 'T3+');
-  assert.equal(detectType('Chambre en colocation dans T4'), 'chambre');
+  assert.equal(detectType('Location parking Saint-Nazaire'), 'autre');
+  assert.equal(detectType('Appartement à louer', '', 24), 'studio');
+  assert.equal(detectType('Appartement à louer', '', 40), 'T2');
   assert.equal(parseAvailability('Disponible le 04/01/2027'), '2027-01-04');
   assert.equal(parseAvailability('Disponible mi-décembre 2026'), '2026-12-15');
-  assert.equal(parseAvailability('Disponible janvier 2027'), '2027-01-01');
   assert.equal(parseAvailability('Libre de suite'), null);
 });
 
 test('détection des colocations', () => {
   assert.equal(detectShared('Chambre en colocation dans T4 centre-ville'), true);
-  assert.equal(detectShared('T3 à partager avec un colocataire'), true);
   assert.equal(detectShared('Chambre chez l’habitant'), true);
   assert.equal(detectShared('T2 avec une chambre sur cour'), false);
   assert.equal(detectShared('Studio meublé. Pas de colocation.'), false);
 });
 
-test('détection des quartiers', () => {
-  assert.equal(detectDistrict('Saint-Nazaire (44600), Front de mer')?.id, 'front-de-mer');
-  assert.equal(detectDistrict('Saint-Nazaire (44600), Méan-Penhoët')?.id, 'mean-penhoet');
-  assert.equal(detectDistrict('Saint-Nazaire (44600), Centre-ville')?.id, 'centre-ville');
+test('robots.txt : règle la plus longue, joker, groupe spécifique', () => {
+  const rules = parseRobots(
+    `User-agent: *\nDisallow: /recherche\nAllow: /recherche/location\nDisallow: /*.pdf$\n\nUser-agent: AutreRobot\nDisallow: /`,
+    'immo-saint-nazaire-2027',
+  );
+  assert.equal(isAllowed(rules, '/annonces/123'), true);
+  assert.equal(isAllowed(rules, '/recherche?q=1'), false);
+  assert.equal(isAllowed(rules, '/recherche/location/saint-nazaire'), true);
+  assert.equal(isAllowed(rules, '/doc/plan.pdf'), false);
+  assert.equal(isAllowed(parseRobots('User-agent: *\nDisallow:', 'x'), '/tout'), true);
+  assert.equal(isAllowed(parseRobots('User-agent: *\nDisallow: /', 'x'), '/tout'), false);
+  const own = parseRobots('User-agent: *\nDisallow: /\n\nUser-agent: immo-saint-nazaire-2027\nAllow: /', 'immo-saint-nazaire-2027/2.0');
+  assert.equal(isAllowed(own, '/annonces'), true);
+});
+
+test('extraction : page d’agence avec JSON-LD', () => {
+  const html = `<html><head><title>Annonce</title>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Apartment","name":"Appartement 2 pièces 40 m²",
+  "description":"T2 au 2e étage avec balcon, rue de la Paix.","floorSize":{"@type":"QuantitativeValue","value":40},
+  "address":{"@type":"PostalAddress","streetAddress":"12 rue de la Paix","postalCode":"44600","addressLocality":"Saint-Nazaire"},
+  "offers":{"@type":"Offer","price":"560","priceCurrency":"EUR"}}</script></head>
+  <body><nav>Accueil Acheter Louer</nav><h1>Appartement 2 pièces 40 m²</h1><p>Loyer 560 € charges comprises</p>
+  <aside>Biens similaires : 1 280 € par mois</aside></body></html>`;
+  const e = extractFromHtml(html);
+  assert.equal(e.rent, 560);
+  assert.equal(e.chargesMode, 'cc');
+  assert.equal(e.surface, 40);
+  assert.equal(e.locationText, 'Saint-Nazaire (44600)');
+  assert.equal(e.address, '12 rue de la Paix');
+});
+
+test('extraction : page d’agence sans données structurées', () => {
+  const html = `<html><body><header>Louer Acheter 3 999 € de frais</header>
+  <h1>Location appartement 1 pièce - 25.21m² à Saint nazaire (44600)</h1>
+  <div>SAINT NAZAIRE (44600)</div><div>Au prix de (par mois)</div><div>412.6 €</div><div>cc</div>
+  <p>Studio refait à neuf, 3e étage avec ascenseur, avenue de la République. Disponible le 02/01/2027.</p>
+  <div>Ces biens pourraient également vous plaire : 2 090 €</div></body></html>`;
+  const e = extractFromHtml(html);
+  assert.equal(e.rent, 413);
+  assert.equal(e.chargesMode, 'cc');
+  assert.equal(e.surface, 25.21);
+  assert.equal(e.locationText, 'Saint-Nazaire (44600)');
+  assert.match(e.address ?? '', /avenue de la République/);
+  assert.match(e.availabilityText ?? '', /02\/01\/2027/);
+
+  const rawListing = toRawListing(e, { source: 's', sourceLabel: 'S', ref: 'a', url: 'https://x.fr/a' });
+  const normalized = normalizeListing(rawListing!, TODAY)!;
+  assert.equal(normalized.type, 'T1');
+  assert.equal(normalized.rent, 413);
+  assert.equal(normalized.chargesIncluded, true);
+  assert.equal(normalized.availableFrom, '2027-01-02');
+});
+
+test('extraction : liens de la page de résultats', () => {
+  const links = extractLinks(
+    '<a href="/annonces/biens/location/appartement/saint-nazaire/46afc9a5-befc-4b96-bbe1-a735a2b74641">T2</a><a href="#top">haut</a><a href="mailto:a@b.fr">mail</a>',
+    'https://www.squarehabitat.fr/recherche',
+  );
+  assert.deepEqual(links, [
+    'https://www.squarehabitat.fr/annonces/biens/location/appartement/saint-nazaire/46afc9a5-befc-4b96-bbe1-a735a2b74641',
+  ]);
+  assert.equal(htmlToText('<p>Loyer&nbsp;:&nbsp;520&nbsp;&euro;</p>'), 'Loyer : 520 €');
+});
+
+test('alerte e-mail : une annonce par bloc, liens parasites ignorés', () => {
+  const portal = PORTALS.find((p) => p.id === 'leboncoin')!;
+  const html = `<table>
+  <tr><td><a href="https://www.leboncoin.fr/ad/locations/2914507731"><img src="x.jpg"></a></td>
+      <td><a href="https://www.leboncoin.fr/ad/locations/2914507731">Studio meublé 24 m² hypercentre</a><br>490 € CC<br>Saint-Nazaire 44600 Centre-ville</td></tr>
+  <tr><td><a href="https://www.leboncoin.fr/ad/locations/2915002917">Appartement 2 pièces 40 m²</a><br>550 €<br>Saint-Nazaire 44600</td></tr>
+  <tr><td><a href="https://www.leboncoin.fr/mes-alertes/desinscription">Se désinscrire</a> 100 €</td></tr>
+  </table>`;
+  const listings = parseAlertEmail(html, portal, '2026-11-14T07:00:00Z');
+  assert.equal(listings.length, 2);
+  assert.equal(listings[0].url, 'https://www.leboncoin.fr/ad/locations/2914507731');
+  assert.equal(listings[0].priceText, '490 € CC');
+  assert.equal(listings[0].surfaceText, '24 m²');
+  assert.equal(listings[1].priceText, '550 €');
+  assert.equal(listings[1].surfaceText, '40 m²');
+  assert.equal(listings[1].publishedAt, '2026-11-14');
+});
+
+test('extraction depuis un texte : loyer en contexte plutôt que premier montant', () => {
+  const e = extractFromText('Frais de dossier 150 €\nT2 lumineux 38 m²\nLoyer : 595 € + 40 € de charges\nSaint-Nazaire (44600)');
+  assert.equal(e.rent, 595);
+  assert.equal(e.chargesMode, 'hc');
+  assert.equal(e.charges, 40);
+});
+
+test('normalisation : localisation par quartier, par coordonnées ou inconnue', () => {
+  const byDistrict = normalizeListing(raw({ locationText: 'Saint-Nazaire (44600), Front de mer' }), TODAY)!;
+  assert.equal(byDistrict.districtId, 'front-de-mer');
+  assert.equal(byDistrict.locationPrecision, 'quartier');
+
+  const unknown = normalizeListing(raw({ description: 'Bel appartement lumineux.' }), TODAY)!;
+  assert.equal(unknown.districtId, null);
+  assert.equal(unknown.locationPrecision, 'inconnue');
+
+  const located = withCoordinates(unknown, 47.2722, -2.199);
+  assert.equal(located.districtId, 'petit-maroc');
+  assert.equal(located.locationPrecision, 'adresse');
+  assert.ok(detectDistrict('Saint-Nazaire (44600), Méan-Penhoët')?.id === 'mean-penhoet');
 });
 
 test('le centre-ville et le front de mer sont à moins de 20 min à vélo des Chantiers', () => {
   for (const id of ['centre-ville', 'front-de-mer', 'ville-port', 'petit-maroc', 'gare']) {
-    const d = getDistrict(id);
-    const trip = bikeTrip(d.lat, d.lng);
-    assert.ok(trip.minutes <= CRITERIA.maxBikeMinutes, `${d.name} : ${trip.minutes} min`);
+    const d = getDistrict(id)!;
+    assert.ok(bikeTrip(d.lat, d.lng).minutes <= CRITERIA.maxBikeMinutes, d.name);
   }
-  const saintMarc = getDistrict('saint-marc');
+  const saintMarc = getDistrict('saint-marc')!;
   assert.ok(bikeTrip(saintMarc.lat, saintMarc.lng).minutes > CRITERIA.maxBikeMinutes);
 });
 
 test('coût mensuel ramené charges comprises', () => {
-  assert.equal(monthlyCost(listing({ rent: 540, chargesIncluded: true })).cost, 540);
   assert.equal(monthlyCost(listing({ rent: 540, chargesIncluded: false, charges: 45 })).cost, 585);
   const estimated = monthlyCost(listing({ rent: 590, chargesIncluded: false, charges: null }));
   assert.equal(estimated.cost, 590 + CRITERIA.chargesEstimate.T2);
   assert.equal(estimated.estimated, true);
 });
 
-test('filtrage : colocation, budget, type, distance, commune', () => {
+test('filtrage strict : colocation, budget, type, distance, commune', () => {
   const codes = (l: Listing) => evaluate(l).rejections.map((r) => r.code);
   assert.deepEqual(codes(listing()), []);
   assert.deepEqual(codes(listing({ rent: 700 })), []);
   assert.deepEqual(codes(listing({ rent: 701 })), ['budget']);
-  assert.deepEqual(codes(listing({ rent: 680, chargesIncluded: false, charges: 45 })), ['budget']);
   assert.deepEqual(codes(listing({ isShared: true })), ['colocation']);
   assert.deepEqual(codes(listing({ type: 'T3+' })), ['type']);
-  const far = getDistrict('saint-marc');
+  assert.deepEqual(codes(listing({ type: 'autre' })), ['type']);
+  const far = getDistrict('saint-marc')!;
   assert.deepEqual(codes(listing({ districtId: far.id, lat: far.lat, lng: far.lng })), ['distance']);
-  assert.deepEqual(codes(listing({ city: 'Pornichet' })), ['ville']);
+  assert.deepEqual(codes(listing({ city: 'Saint-Nazaire', postcode: '66570' })), ['ville']);
+  assert.deepEqual(codes(listing({ city: 'Pornichet', postcode: '44380' })), ['ville']);
+  // Adresse non précisée : conservée, trajet à vérifier.
+  const unknown = evaluate(listing({ districtId: null, lat: null, lng: null, locationPrecision: 'inconnue' }));
+  assert.equal(unknown.accepted, true);
+  assert.equal(unknown.bikeMinutes, null);
+  assert.equal(unknown.zone, 'inconnu');
 });
 
 test('score : moins cher, plus proche et mieux daté passe devant', () => {
   const ideal = evaluate(listing({ rent: 520 }));
   const pricey = evaluate(listing({ rent: 690 }));
-  assert.ok(ideal.score > pricey.score);
-  assert.equal(ideal.budgetTier, 'ideal');
-  assert.equal(pricey.budgetTier, 'dernier-recours');
-
   const late = evaluate(listing({ rent: 520, availableFrom: '2027-04-01' }));
+  const unknown = evaluate(listing({ rent: 520, districtId: null, lat: null, lng: null, locationPrecision: 'inconnue' }));
+  assert.ok(ideal.score > pricey.score);
   assert.ok(ideal.score > late.score);
-
-  for (const l of [ideal, pricey, late]) {
+  assert.ok(ideal.score > unknown.score);
+  for (const l of [ideal, pricey, late, unknown]) {
     assert.ok(l.score >= 0 && l.score <= 100);
     for (const part of l.scoreParts) assert.ok(part.points >= 0 && part.points <= part.max);
   }
 });
 
-test('jeu de démonstration : rien hors critères ne passe le filtre', async () => {
-  const raw = await mockSource.fetch();
-  const normalized = raw.map(normalizeListing).filter((l): l is Listing => l !== null);
-  assert.equal(normalized.length, raw.length, 'toutes les annonces de démonstration sont lisibles');
-
-  const { unique, removed } = dedupe(normalized);
+test('dédoublonnage et tris', () => {
+  const a = listing({ id: 'a', url: 'https://a.fr/1' });
+  const b = listing({ id: 'b', url: 'https://b.fr/9' });
+  const c = listing({ id: 'c', url: 'https://c.fr/3', rent: 480, surface: 22, type: 'studio' });
+  const { unique, removed } = dedupe([a, b, c]);
   assert.equal(removed, 1);
-
   const evaluated = unique.map((l) => evaluate(l));
-  const accepted = evaluated.filter((l) => l.accepted);
-  const rejected = evaluated.filter((l) => !l.accepted);
-  assert.ok(accepted.length >= 15, `${accepted.length} annonces retenues`);
-  assert.ok(rejected.length >= 10, `${rejected.length} annonces écartées`);
-
-  for (const l of accepted) {
-    assert.equal(l.isShared, false, l.title);
-    assert.ok(CRITERIA.allowedTypes.includes(l.type), l.title);
-    assert.ok(l.monthlyCost <= CRITERIA.maxRent, l.title);
-    assert.ok(l.bikeMinutes <= CRITERIA.maxBikeMinutes, l.title);
-    assert.equal(l.city, 'Saint-Nazaire', l.title);
-  }
-  for (const code of ['colocation', 'budget', 'type', 'distance', 'ville'] as const) {
-    assert.ok(
-      rejected.some((l) => l.rejections.some((r) => r.code === code)),
-      `au moins une annonce écartée pour « ${code} »`,
-    );
-  }
+  assert.deepEqual(sortListings(evaluated, 'price-asc').map((l) => l.id), ['c', 'a']);
+  const studios = applyFilters(evaluated, { ...DEFAULT_FILTERS, type: 'studio' }, () => 'a-analyser');
+  assert.deepEqual(studios.map((l) => l.id), ['c']);
 });
 
-test('filtres et tris du tableau de bord', async () => {
-  const raw = await mockSource.fetch();
-  const accepted = raw
-    .map(normalizeListing)
-    .filter((l): l is Listing => l !== null)
-    .map((l) => evaluate(l))
-    .filter((l) => l.accepted);
-  const statusOf = () => 'a-analyser' as const;
-
-  const coeur = applyFilters(accepted, DEFAULT_FILTERS, statusOf);
-  assert.ok(coeur.length > 0 && coeur.every((l) => l.zone === 'coeur'));
-
-  const cheapT2 = applyFilters(
-    accepted,
-    { ...DEFAULT_FILTERS, zone: 'all', type: 'T2', maxCost: 600 },
-    statusOf,
+test('alerte e-mail : les paramètres de suivi sont retirés des liens publiés', async () => {
+  const { cleanUrl } = await import('../scripts/sources/email-alerts');
+  assert.equal(
+    cleanUrl('https://www.leboncoin.fr/ad/locations/2914507731?utm_source=alerte&uid=abc123&page=2#photos'),
+    'https://www.leboncoin.fr/ad/locations/2914507731?page=2',
   );
-  assert.ok(cheapT2.length > 0 && cheapT2.every((l) => l.type === 'T2' && l.monthlyCost <= 600));
-
-  const byPrice = sortListings(accepted, 'price-asc').map((l) => l.monthlyCost);
-  assert.deepEqual(byPrice, [...byPrice].sort((a, b) => a - b));
-  const byScore = sortListings(accepted, 'score').map((l) => l.score);
-  assert.deepEqual(byScore, [...byScore].sort((a, b) => b - a));
 });

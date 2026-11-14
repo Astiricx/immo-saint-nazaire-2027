@@ -13,7 +13,6 @@ import {
 import { useEffect } from 'react';
 import { BUDGET_TIER_LABELS } from '@/lib/evaluate';
 import { STATUSES } from '@/lib/pipeline';
-import { linkLabel } from '@/lib/sources';
 import type { BudgetTier, EvaluatedListing, StatusId } from '@/lib/types';
 
 export const STATUS_ICONS: Record<StatusId, LucideIcon> = {
@@ -86,7 +85,7 @@ export function StatusSelect({
   );
 }
 
-/** Lien vers l'annonce ; rien n'est rendu si l'adresse n'est pas une URL http(s). */
+/** Lien vers l'annonce d'origine ; rien n'est rendu si l'adresse n'est pas une URL http(s). */
 export function ListingLink({
   listing,
   className = 'btn',
@@ -97,7 +96,7 @@ export function ListingLink({
   iconOnly?: boolean;
 }) {
   if (!/^https?:\/\//i.test(listing.url)) return null;
-  const label = linkLabel(listing);
+  const label = `Voir l’annonce sur ${listing.sourceLabel}`;
   return (
     <a
       href={listing.url}

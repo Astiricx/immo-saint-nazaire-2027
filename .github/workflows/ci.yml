@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Appelé par la collecte quotidienne (scrape.yml) pour publier les nouvelles annonces.
+  workflow_call:
+    inputs:
+      ref:
+        description: Branche ou commit à publier
+        type: string
+        default: main
 
 permissions:
   contents: read
@@ -22,6 +29,8 @@ jobs:
       pages: ${{ steps.pages.outputs.enabled }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - uses: actions/setup-node@v4
         with:

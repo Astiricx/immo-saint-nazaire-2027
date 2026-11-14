@@ -1,28 +1,25 @@
 'use client';
 
-import { Info, X } from 'lucide-react';
 import { CRITERIA } from '@/lib/criteria';
-import { euro, formatDate } from '@/lib/format';
+import { euro, formatDateTime } from '@/lib/format';
+import type { ListingsFile } from '@/lib/types';
 import { LoadLine } from './LoadLine';
 
-/** En-tête de page : le brief de la recherche, le bilan du filtrage et la lecture de la jauge. */
+/** En-tête de page : le brief de la recherche, le bilan de la collecte et la lecture de la jauge. */
 export function Brief({
   accepted,
-  collected,
-  rejected,
   idealCount,
-  generatedAt,
-  showDemoNotice,
-  onDismissDemoNotice,
+  data,
 }: {
   accepted: number;
-  collected: number;
-  rejected: number;
   idealCount: number;
-  generatedAt: string;
-  showDemoNotice: boolean;
-  onDismissDemoNotice: () => void;
+  data: ListingsFile | null;
 }) {
+  const rejected = data
+    ? Object.values(data.stats.rejected).reduce((sum, n) => sum + (n ?? 0), 0)
+    : 0;
+  const activeSources = data?.sources.filter((s) => s.status === 'ok').length ?? 0;
+
   return (
     <section id="top" className="grid gap-x-12 gap-y-6 py-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-10">
       <div>
@@ -30,33 +27,28 @@ export function Brief({
           Un studio ou un T2 à Saint-Nazaire, à vélo des Chantiers, pour janvier 2027
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-          {accepted} annonces retenues sur {collected} collectées le {formatDate(generatedAt)}.{' '}
-          {idealCount} tiennent dans le budget idéal de {euro(CRITERIA.idealRent)}.{' '}
-          <a href="#ecartees" className="text-ink underline decoration-line underline-offset-4 hover:decoration-ink">
-            {rejected} ont été écartées automatiquement
-          </a>{' '}
-          : colocations, loyers au-dessus de {euro(CRITERIA.maxRent)}, biens trop grands ou trop
-          loin.
+          {data?.generatedAt ? (
+            <>
+              {accepted} annonce{accepted > 1 ? 's' : ''} retenue{accepted > 1 ? 's' : ''}, dont{' '}
+              {idealCount} dans le budget idéal de {euro(CRITERIA.idealRent)}. Dernière collecte le{' '}
+              {formatDateTime(data.generatedAt)} sur {activeSources} source
+              {activeSources > 1 ? 's' : ''} ;{' '}
+              <a
+                href="#collecte"
+                className="text-ink underline decoration-line underline-offset-4 hover:decoration-ink"
+              >
+                {rejected} annonce{rejected > 1 ? 's' : ''} écartée{rejected > 1 ? 's' : ''}
+              </a>{' '}
+              automatiquement (colocations, loyers au-dessus de {euro(CRITERIA.maxRent)}, biens trop
+              grands ou trop loin).
+            </>
+          ) : (
+            <>
+              Les annonces sont collectées chaque matin et filtrées selon vos critères. La première
+              collecte n’a pas encore été publiée.
+            </>
+          )}
         </p>
-
-        {showDemoNotice ? (
-          <div className="mt-6 flex max-w-2xl items-start gap-3 rounded-md border border-line bg-surface p-3 text-sm">
-            <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-            <p className="leading-relaxed">
-              Les annonces affichées sont des exemples réalistes, pas de vraies offres : leur lien
-              ouvre la recherche correspondante sur le portail. Ajoutez vos vraies annonces avec
-              « Ajouter une annonce », ou branchez un flux avec le script de collecte.
-            </p>
-            <button
-              type="button"
-              className="btn btn-quiet -my-1 -mr-1 px-1.5"
-              onClick={onDismissDemoNotice}
-              aria-label="Masquer ce message"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <aside aria-label="Critères de la recherche" className="self-end">

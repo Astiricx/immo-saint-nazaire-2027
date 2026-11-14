@@ -130,7 +130,7 @@ export function KanbanBoard({
                       </h3>
                       <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted">
                         <Bike className="size-4 shrink-0" aria-hidden />
-                        {l.bikeMinutes} min
+                        {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'Trajet à vérifier'}
                       </p>
                       {entry.visitDate ? (
                         <p className="mt-1 flex items-center gap-1.5 text-sm">

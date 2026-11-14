@@ -1,0 +1,72 @@
+name: Collecte quotidienne des annonces
+
+on:
+  schedule:
+    # Tous les jours à 7 h 17 UTC : 8 h 17 à Saint-Nazaire en hiver, 9 h 17 en été.
+    # (GitHub retarde souvent les tâches lancées pile à l'heure : d'où la minute 17.)
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: Détailler chaque page lue dans le journal
+        type: boolean
+        default: false
+
+concurrency:
+  group: collecte
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Collecte et filtrage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+
+      - name: Collecter les annonces
+        run: npm run collect
+        env:
+          # Facultatif : alertes e-mail des portails (voir le README).
+          IMAP_USER: ${{ secrets.IMAP_USER }}
+          IMAP_PASSWORD: ${{ secrets.IMAP_PASSWORD }}
+          IMAP_HOST: ${{ secrets.IMAP_HOST }}
+          IMAP_MAILBOX: ${{ secrets.IMAP_MAILBOX }}
+          # Facultatif : flux JSON d'annonces, adresses séparées par des virgules.
+          FEED_URLS: ${{ vars.FEED_URLS }}
+          COLLECT_DEBUG: ${{ inputs.debug && '1' || '' }}
+
+      - name: Enregistrer public/listings.json dans le dépôt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/listings.json
+          if git diff --cached --quiet; then
+            echo "Aucun changement."
+          else
+            git commit -m "Collecte du $(date -u +%Y-%m-%d) : $(node -p "require('./public/listings.json').listings.length") annonce(s) retenue(s)"
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
+          fi
+
+  # Un push fait par le workflow ne déclenche pas les autres workflows :
+  # on appelle donc directement le build et le déploiement du site.
+  publish:
+    name: Publication du site
+    needs: collect
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: main
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

@@ -39,6 +39,7 @@ export const CRITERIA = {
     'T3+': 70,
     chambre: 0,
     maison: 80,
+    autre: 40,
   } as Record<PropertyType, number>,
 };
 

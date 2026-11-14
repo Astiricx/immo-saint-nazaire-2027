@@ -52,10 +52,21 @@ export function reviveTracker(value: unknown): TrackerState {
     }
   }
   const custom = Array.isArray(input.custom)
-    ? input.custom.filter(
-        (l): l is Listing =>
-          !!l && typeof l === 'object' && typeof l.id === 'string' && typeof l.rent === 'number',
-      )
+    ? input.custom
+        .filter(
+          (l): l is Listing =>
+            !!l && typeof l === 'object' && typeof l.id === 'string' && typeof l.rent === 'number',
+        )
+        // Annonces enregistrées par une version précédente : on complète les champs ajoutés depuis.
+        .map((l) => ({
+          ...l,
+          sourceLabel: l.sourceLabel ?? 'Ajout manuel',
+          postcode: l.postcode ?? '44600',
+          address: l.address ?? null,
+          locationPrecision: l.locationPrecision ?? 'quartier',
+          firstSeen: l.firstSeen ?? (l.publishedAt as string | null) ?? '2026-11-14',
+          publishedAt: l.publishedAt ?? null,
+        }))
     : [];
   return { version: 1, entries, custom };
 }

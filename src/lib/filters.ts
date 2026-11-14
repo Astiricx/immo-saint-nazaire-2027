@@ -23,8 +23,8 @@ export const DEFAULT_FILTERS: Filters = {
   maxCost: CRITERIA.maxRent,
   minSurface: 0,
   minScore: 0,
-  // Critère strict de la recherche : centre-ville et front de mer d'abord.
-  zone: 'coeur',
+  // Les annonces qui ne précisent pas le quartier restent visibles : à vérifier une par une.
+  zone: 'all',
   status: 'all',
 };
 
@@ -34,7 +34,7 @@ export const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: 'price-desc', label: 'Loyer décroissant' },
   { id: 'surface', label: 'Surface décroissante' },
   { id: 'bike', label: 'Trajet vélo le plus court' },
-  { id: 'recent', label: 'Publication récente' },
+  { id: 'recent', label: 'Plus récentes' },
 ];
 
 export function isDefaultFilters(filters: Filters): boolean {
@@ -73,8 +73,9 @@ export function sortListings(listings: EvaluatedListing[], sort: SortKey): Evalu
     'price-asc': (a, b) => a.monthlyCost - b.monthlyCost || byScore(a, b),
     'price-desc': (a, b) => b.monthlyCost - a.monthlyCost || byScore(a, b),
     surface: (a, b) => b.surface - a.surface || byScore(a, b),
-    bike: (a, b) => a.bikeMinutes - b.bikeMinutes || byScore(a, b),
-    recent: (a, b) => b.publishedAt.localeCompare(a.publishedAt) || byScore(a, b),
+    bike: (a, b) => (a.bikeMinutes ?? 999) - (b.bikeMinutes ?? 999) || byScore(a, b),
+    recent: (a, b) =>
+      (b.publishedAt ?? b.firstSeen).localeCompare(a.publishedAt ?? a.firstSeen) || byScore(a, b),
   };
   return [...listings].sort(comparators[sort]);
 }

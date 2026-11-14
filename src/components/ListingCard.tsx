@@ -2,7 +2,6 @@
 
 import { Bike, CalendarCheck, FileText, MapPin } from 'lucide-react';
 import { euro, formatAvailability, formatDate, formatSurface, typeLabel } from '@/lib/format';
-import { sourceLabel } from '@/lib/sources';
 import type { TrackEntry } from '@/lib/storage';
 import type { EvaluatedListing, StatusId } from '@/lib/types';
 import { LoadLine } from './LoadLine';
@@ -57,10 +56,14 @@ export function ListingCard({
       <ul className="grid gap-2 px-4 py-4 text-sm">
         <li className="flex items-center gap-2">
           <Bike className="size-4 shrink-0 text-muted" aria-hidden />
-          <span>
-            <span className="font-medium tabular-nums">{l.bikeMinutes} min</span> à vélo des
-            Chantiers
-          </span>
+          {l.bikeMinutes != null ? (
+            <span>
+              <span className="font-medium tabular-nums">{l.bikeMinutes} min</span> à vélo des
+              Chantiers
+            </span>
+          ) : (
+            <span className="text-muted">Adresse non précisée : trajet à vérifier</span>
+          )}
         </li>
         <li className="flex items-center gap-2">
           <MapPin className="size-4 shrink-0 text-muted" aria-hidden />
@@ -86,8 +89,7 @@ export function ListingCard({
         <ListingLink listing={l} iconOnly className="btn px-2.5" />
       </div>
       <p className="border-t border-line px-4 py-2 text-xs text-muted">
-        {sourceLabel(l.source)}, publiée le {formatDate(l.publishedAt, false)}
-        {l.isDemo ? ' (exemple)' : ''}
+        {l.sourceLabel}, repérée le {formatDate(l.publishedAt ?? l.firstSeen, false)}
       </p>
     </article>
   );

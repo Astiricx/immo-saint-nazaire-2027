@@ -44,6 +44,7 @@ const ZONE_LABELS: Record<Zone, string> = {
   coeur: 'Centre-ville ou front de mer',
   proche: 'Quartier voisin du centre',
   eloigne: 'Secteur excentré',
+  inconnu: 'Secteur non précisé dans l’annonce',
 };
 
 function priceScore(cost: number, criteria: Criteria): number {
@@ -53,7 +54,9 @@ function priceScore(cost: number, criteria: Criteria): number {
   return 40 - ratio * 32;
 }
 
-function bikeScore(minutes: number, criteria: Criteria): number {
+function bikeScore(minutes: number | null, criteria: Criteria): number {
+  // Logement non situé : note neutre, à vérifier avant de candidater.
+  if (minutes == null) return 10;
   if (minutes > criteria.maxBikeMinutes) return 0;
   if (minutes <= 8) return 25;
   const ratio = (minutes - 8) / (criteria.maxBikeMinutes - 8);
@@ -63,6 +66,7 @@ function bikeScore(minutes: number, criteria: Criteria): number {
 function zoneScore(zone: Zone): number {
   if (zone === 'coeur') return 15;
   if (zone === 'proche') return 8;
+  if (zone === 'inconnu') return 5;
   return 2;
 }
 
@@ -74,7 +78,7 @@ function availabilityScore(
   if (!availableFrom || availableFrom < acceptableFrom) {
     return {
       points: 6,
-      detail: 'Libre dès maintenant : date d’entrée à négocier, risque de payer avant janvier',
+      detail: 'Libre de suite ou date non précisée : date d’entrée à négocier',
     };
   }
   const label = formatAvailability(availableFrom);
@@ -109,17 +113,20 @@ function comfortScore(listing: Listing): { points: number; detail: string } {
 function collectRejections(
   listing: Listing,
   cost: number,
-  bikeMinutes: number,
+  bikeMinutes: number | null,
   criteria: Criteria,
 ): Rejection[] {
   const rejections: Rejection[] = [];
-  const inCity = isTargetCity(listing.city);
+  const inCity = isTargetCity(listing.city, listing.postcode);
 
   if (!inCity) {
+    const where = [listing.city, listing.postcode ? `(${listing.postcode})` : '']
+      .filter(Boolean)
+      .join(' ');
     rejections.push({
       code: 'ville',
       label: 'Hors Saint-Nazaire',
-      detail: `Située à ${listing.city}`,
+      detail: where ? `Située à ${where}` : 'Commune non précisée',
     });
   }
   if (listing.isShared || listing.type === 'chambre') {
@@ -142,7 +149,7 @@ function collectRejections(
       detail: `${euro(cost)} charges comprises, plafond à ${euro(criteria.maxRent)}`,
     });
   }
-  if (inCity && bikeMinutes > criteria.maxBikeMinutes) {
+  if (inCity && bikeMinutes != null && bikeMinutes > criteria.maxBikeMinutes) {
     rejections.push({
       code: 'distance',
       label: 'Trop loin à vélo',
@@ -155,8 +162,14 @@ function collectRejections(
 /** Calcule coût réel, trajet, score sur 100 et verdict de filtrage d'une annonce. */
 export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): EvaluatedListing {
   const district = getDistrict(listing.districtId);
+  const zone: Zone = district?.zone ?? 'inconnu';
   const { cost, estimated, charges } = monthlyCost(listing, criteria);
-  const trip = bikeTrip(listing.lat, listing.lng);
+  const trip =
+    listing.lat != null && listing.lng != null ? bikeTrip(listing.lat, listing.lng) : null;
+  const inCity = isTargetCity(listing.city, listing.postcode);
+  const districtName = !inCity
+    ? listing.city || 'Commune non précisée'
+    : (district?.name ?? 'Secteur non précisé');
   const availability = availabilityScore(listing.availableFrom, criteria);
   const comfort = comfortScore(listing);
   const tier = budgetTier(cost, criteria);
@@ -172,16 +185,20 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
     {
       id: 'trajet',
       label: 'Trajet à vélo',
-      points: round1(bikeScore(trip.minutes, criteria)),
+      points: round1(bikeScore(trip?.minutes ?? null, criteria)),
       max: 25,
-      detail: `${trip.minutes} min jusqu’aux Chantiers`,
+      detail: trip
+        ? `${trip.minutes} min jusqu’aux Chantiers${
+            listing.locationPrecision === 'quartier' ? ', depuis le centre du quartier' : ''
+          }`
+        : 'Adresse non précisée : trajet à vérifier',
     },
     {
       id: 'secteur',
       label: 'Secteur',
-      points: zoneScore(district.zone),
+      points: zoneScore(zone),
       max: 15,
-      detail: `${district.name} : ${ZONE_LABELS[district.zone].toLowerCase()}`,
+      detail: district ? `${district.name} : ${ZONE_LABELS[zone].toLowerCase()}` : ZONE_LABELS[zone],
     },
     {
       id: 'disponibilite',
@@ -199,7 +216,7 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
     },
   ];
 
-  const rejections = collectRejections(listing, cost, trip.minutes, criteria);
+  const rejections = collectRejections(listing, cost, trip?.minutes ?? null, criteria);
   const score = Math.round(scoreParts.reduce((sum, part) => sum + part.points, 0));
 
   return {
@@ -207,10 +224,10 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
     monthlyCost: cost,
     costIsEstimated: estimated,
     estimatedCharges: charges,
-    bikeMinutes: trip.minutes,
-    bikeKm: trip.km,
-    districtName: isTargetCity(listing.city) ? district.name : listing.city,
-    zone: district.zone,
+    bikeMinutes: trip?.minutes ?? null,
+    bikeKm: trip?.km ?? null,
+    districtName,
+    zone,
     budgetTier: tier,
     score,
     scoreParts,

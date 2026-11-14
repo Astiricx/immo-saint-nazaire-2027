@@ -32,6 +32,7 @@ export const BIKE = {
 /**
  * Quartiers de Saint-Nazaire, du plus spécifique au plus générique :
  * la détection s'arrête au premier mot-clé trouvé, « centre-ville » passe donc en dernier.
+ * Les centres sont approximatifs : ils servent quand l'annonce ne donne que le quartier.
  */
 export const DISTRICTS: District[] = [
   {
@@ -162,31 +163,28 @@ export const DISTRICTS: District[] = [
     lng: -2.2125,
     keywords: ['centre ville', 'hypercentre', 'hyper centre', 'hotel de ville', 'mairie', 'republique'],
   },
-  {
-    id: 'autre',
-    name: 'Autre secteur',
-    zone: 'eloigne',
-    lat: 47.2745,
-    lng: -2.2125,
-    keywords: [],
-  },
 ];
 
 const DISTRICT_BY_ID: Record<string, District> = Object.fromEntries(
   DISTRICTS.map((d) => [d.id, d]),
 );
 
-/** Communes voisines, pour situer une annonce qui n'est pas à Saint-Nazaire. */
-export const NEARBY_CITIES: Record<string, { lat: number; lng: number }> = {
-  pornichet: { lat: 47.265, lng: -2.34 },
-  trignac: { lat: 47.318, lng: -2.188 },
-  montoir: { lat: 47.329, lng: -2.151 },
-  'la baule': { lat: 47.286, lng: -2.391 },
-  'saint andre des eaux': { lat: 47.314, lng: -2.311 },
-};
+export function getDistrict(id: string | null | undefined): District | undefined {
+  return id ? DISTRICT_BY_ID[id] : undefined;
+}
 
-export function getDistrict(id: string): District {
-  return DISTRICT_BY_ID[id] ?? DISTRICT_BY_ID.autre;
+/** Quartier le plus proche d'un point, s'il est à moins de 1,2 km de son centre. */
+export function nearestDistrict(lat: number, lng: number): District | undefined {
+  let best: District | undefined;
+  let bestKm = Infinity;
+  for (const district of DISTRICTS) {
+    const km = haversineKm({ lat, lng }, district);
+    if (km < bestKm) {
+      best = district;
+      bestKm = km;
+    }
+  }
+  return bestKm <= 1.2 ? best : undefined;
 }
 
 /** Minuscules, sans accent, tirets et apostrophes remplacés par des espaces. */
@@ -200,9 +198,13 @@ export function normalizeText(input: string): string {
     .trim();
 }
 
-export function isTargetCity(city: string): boolean {
+export const TARGET_POSTCODE = '44600';
+
+/** Saint-Nazaire (44600). Saint-Marc-sur-Mer fait partie de la commune. */
+export function isTargetCity(city: string, postcode: string | null = null): boolean {
+  if (postcode) return postcode === TARGET_POSTCODE;
   const c = normalizeText(city);
-  return c === 'saint nazaire' || c === 'st nazaire';
+  return c === 'saint nazaire' || c === 'st nazaire' || c === 'saint marc sur mer';
 }
 
 export function detectDistrict(text: string): District | null {

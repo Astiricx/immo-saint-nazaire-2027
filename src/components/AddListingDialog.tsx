@@ -37,7 +37,7 @@ const EMPTY_FORM: FormState = {
 };
 
 const TYPE_CHOICES: PropertyType[] = ['studio', 'T1', 'T2'];
-const DISTRICT_CHOICES = DISTRICTS.filter((d) => d.id !== 'autre').sort((a, b) =>
+const DISTRICT_CHOICES = [...DISTRICTS].sort((a, b) =>
   a.name.localeCompare(b.name, 'fr'),
 );
 
@@ -45,11 +45,12 @@ function buildListing(form: FormState, id: string, today: string): Listing | nul
   const rent = Number(form.rent.replace(',', '.'));
   const surface = Number(form.surface.replace(',', '.'));
   if (!(rent > 0) || !(surface > 0)) return null;
-  const district = getDistrict(form.districtId);
+  const district = getDistrict(form.districtId) ?? DISTRICTS[DISTRICTS.length - 1];
   const charges = Number(form.charges.replace(',', '.'));
   return {
     id,
     source: 'manuel',
+    sourceLabel: 'Ajout manuel',
     url: form.url.trim(),
     title: form.title.trim() || `${typeLabel(form.type)} de ${surface} m², ${district.name}`,
     description: form.description.trim(),
@@ -61,13 +62,16 @@ function buildListing(form: FormState, id: string, today: string): Listing | nul
     surface,
     furnished: form.furnished,
     city: 'Saint-Nazaire',
+    postcode: '44600',
     districtId: district.id,
+    address: null,
     lat: district.lat,
     lng: district.lng,
+    locationPrecision: 'quartier',
     availableFrom: form.availableFrom || null,
     publishedAt: today,
+    firstSeen: today,
     features: [],
-    isDemo: false,
   };
 }
 

@@ -1,17 +1,10 @@
-export type PropertyType = 'studio' | 'T1' | 'T2' | 'T3+' | 'chambre' | 'maison';
+export type PropertyType = 'studio' | 'T1' | 'T2' | 'T3+' | 'chambre' | 'maison' | 'autre';
 
-export type SourceId =
-  | 'leboncoin'
-  | 'seloger'
-  | 'bienici'
-  | 'ouestfrance-immo'
-  | 'location-etudiant'
-  | 'agence'
-  | 'flux'
-  | 'manuel';
+/** coeur = centre-ville et front de mer ; proche = quartiers voisins ; eloigne = le reste ; inconnu = non précisé. */
+export type Zone = 'coeur' | 'proche' | 'eloigne' | 'inconnu';
 
-/** coeur = centre-ville et front de mer ; proche = quartiers voisins ; eloigne = le reste. */
-export type Zone = 'coeur' | 'proche' | 'eloigne';
+/** adresse = rue géocodée ou coordonnées fournies ; quartier = nom de quartier reconnu ; inconnue = rien. */
+export type LocationPrecision = 'adresse' | 'quartier' | 'inconnue';
 
 export type BudgetTier = 'ideal' | 'correct' | 'dernier-recours' | 'hors-budget';
 
@@ -25,10 +18,12 @@ export type StatusId =
   | 'refuse'
   | 'coup-de-coeur';
 
-/** Annonce telle qu'elle sort d'un portail : des textes libres, pas encore de chiffres. */
+/** Annonce telle qu'elle sort d'une source : des textes libres, pas encore de chiffres. */
 export interface RawListing {
-  source: SourceId;
+  source: string;
+  sourceLabel: string;
   ref: string;
+  /** Lien vers la page d'origine de l'annonce. */
   url: string;
   title: string;
   description: string;
@@ -38,21 +33,24 @@ export interface RawListing {
   surfaceText: string;
   /** Ex. « Saint-Nazaire (44600), Centre-ville ». */
   locationText: string;
-  /** Ex. « Disponible le 04/01/2027 », « Libre de suite », « début janvier 2027 ». */
+  /** Ex. « Disponible le 04/01/2027 », « Libre de suite ». */
   availabilityText?: string;
-  publishedAt: string;
+  publishedAt?: string;
+  /** Rue, si l'annonce la donne : sert au géocodage. */
+  address?: string;
   lat?: number;
   lng?: number;
   furnished?: boolean;
-  tags?: string[];
-  /** true pour les annonces de démonstration (lien vers la recherche du portail). */
-  isDemo?: boolean;
 }
 
-/** Annonce normalisée : c'est ce format qui est stocké dans src/data/listings.json. */
+/** Annonce normalisée : c'est ce format qui est publié dans public/listings.json. */
 export interface Listing {
   id: string;
-  source: SourceId;
+  /** Site d'origine de l'annonce (leboncoin, squarehabitat…). */
+  source: string;
+  sourceLabel: string;
+  /** Source de collecte qui l'a trouvée (alertes-email, squarehabitat…), si différente. */
+  collector?: string;
   url: string;
   title: string;
   description: string;
@@ -67,14 +65,18 @@ export interface Listing {
   surface: number;
   furnished: boolean;
   city: string;
-  districtId: string;
-  lat: number;
-  lng: number;
-  /** Date ISO (AAAA-MM-JJ) ; null = libre de suite. */
+  postcode: string | null;
+  districtId: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  locationPrecision: LocationPrecision;
+  /** Date ISO (AAAA-MM-JJ) ; null = libre de suite ou non précisé. */
   availableFrom: string | null;
-  publishedAt: string;
+  publishedAt: string | null;
+  /** Première collecte où l'annonce est apparue. */
+  firstSeen: string;
   features: string[];
-  isDemo: boolean;
 }
 
 export interface ScorePart {
@@ -96,8 +98,9 @@ export interface EvaluatedListing extends Listing {
   monthlyCost: number;
   costIsEstimated: boolean;
   estimatedCharges: number;
-  bikeMinutes: number;
-  bikeKm: number;
+  /** null quand l'annonce ne permet pas de situer le logement. */
+  bikeMinutes: number | null;
+  bikeKm: number | null;
   districtName: string;
   zone: Zone;
   budgetTier: BudgetTier;
@@ -107,10 +110,29 @@ export interface EvaluatedListing extends Listing {
   accepted: boolean;
 }
 
+export type SourceStatus = 'ok' | 'erreur' | 'bloquee' | 'inactive';
+
+export interface SourceReport {
+  id: string;
+  label: string;
+  status: SourceStatus;
+  /** Annonces lues sur la source. */
+  found: number;
+  /** Annonces retenues après filtrage. */
+  kept: number;
+  message?: string;
+}
+
 export interface ListingsFile {
-  generatedAt: string;
-  sources: string[];
-  duplicatesRemoved: number;
-  unreadable: number;
+  /** Date et heure ISO de la dernière collecte ; null avant la première. */
+  generatedAt: string | null;
+  sources: SourceReport[];
+  stats: {
+    collected: number;
+    duplicates: number;
+    unreadable: number;
+    rejected: Partial<Record<RejectionCode, number>>;
+  };
+  /** Uniquement les annonces qui respectent les critères. */
   listings: Listing[];
 }

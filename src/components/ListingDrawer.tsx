@@ -11,7 +11,6 @@ import {
   formatSurface,
   typeLabel,
 } from '@/lib/format';
-import { sourceLabel } from '@/lib/sources';
 import type { TrackEntry } from '@/lib/storage';
 import type { EvaluatedListing } from '@/lib/types';
 import { LoadLine } from './LoadLine';
@@ -105,14 +104,19 @@ export function ListingDrawer({
             <ul className="mt-5 grid gap-2.5 text-sm sm:grid-cols-2">
               <li className="flex items-start gap-2">
                 <Bike className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
-                <span>
-                  <span className="font-medium tabular-nums">{l.bikeMinutes} min</span> à vélo des
-                  Chantiers, environ {formatKm(l.bikeKm)}
-                </span>
+                {l.bikeMinutes != null && l.bikeKm != null ? (
+                  <span>
+                    <span className="font-medium tabular-nums">{l.bikeMinutes} min</span> à vélo des
+                    Chantiers, environ {formatKm(l.bikeKm)}
+                    {l.locationPrecision === 'quartier' ? ' depuis le centre du quartier' : ''}
+                  </span>
+                ) : (
+                  <span>Adresse non précisée : trajet à vérifier sur l’annonce</span>
+                )}
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
-                {l.districtName}
+                {l.address ? `${l.address}, ${l.districtName}` : l.districtName}
               </li>
               <li className="flex items-start gap-2">
                 <CalendarCheck className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
@@ -216,16 +220,15 @@ export function ListingDrawer({
               </ul>
             ) : null}
             <p className="mt-4 text-sm text-muted">
-              {sourceLabel(l.source)}, publiée le {formatDate(l.publishedAt)}.
-              {l.isDemo
-                ? ' Annonce d’exemple : le lien ouvre la recherche du portail, pas une offre précise.'
-                : ''}
+              {l.sourceLabel}
+              {l.publishedAt ? `, publiée le ${formatDate(l.publishedAt)}` : ''}, repérée par la
+              collecte le {formatDate(l.firstSeen)}.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              Trajet estimé : distance à vol d’oiseau majorée de{' '}
+              Les informations viennent de l’annonce d’origine : vérifiez-les avant de vous
+              engager. Trajet estimé : distance à vol d’oiseau majorée de{' '}
               {Math.round((BIKE.detourFactor - 1) * 100)} % pour contourner les bassins, à{' '}
-              {BIKE.speedKmh} km/h, plus {BIKE.fixedMinutes} min. À vérifier sur un itinéraire réel
-              avant de vous engager.
+              {BIKE.speedKmh} km/h, plus {BIKE.fixedMinutes} min.
             </p>
           </section>
         </div>

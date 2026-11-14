@@ -2,7 +2,7 @@
   "name": "immo-saint-nazaire-2027",
   "version": "1.0.0",
   "private": true,
-  "description": "Tableau de bord de recherche de location à Saint-Nazaire : studio ou T2, à vélo des Chantiers de l'Atlantique, pour janvier 2027.",
+  "description": "Tableau de bord de recherche de location à Saint-Nazaire, alimenté chaque jour par une collecte automatique : studio ou T2, à vélo des Chantiers de l'Atlantique, pour janvier 2027.",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "preview": "npx --yes serve@latest out",
-    "scrape": "tsx scripts/scrape.ts",
+    "collect": "tsx scripts/collect.ts",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -25,6 +25,8 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "imapflow": "^1.0.0",
+    "mailparser": "^3.6.0",
     "postcss": "^8.5.25",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.19.0",

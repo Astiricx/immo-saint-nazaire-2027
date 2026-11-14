@@ -128,7 +128,7 @@ export function ListingsTable({
                 </div>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
-                {l.bikeMinutes} min
+                {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'À vérifier'}
               </td>
               <td className="whitespace-nowrap px-3 py-2.5">{formatAvailability(l.availableFrom)}</td>
               <td className="px-3 py-2.5 text-right font-display text-xl font-semibold leading-none tabular-nums">
