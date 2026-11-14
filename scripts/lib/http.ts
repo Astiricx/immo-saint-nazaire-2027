@@ -113,7 +113,10 @@ export async function geocode(address: string): Promise<{ lat: number; lng: numb
       if ((props.score ?? 0) < 0.55 || props.postcode !== '44600' || props.type === 'municipality') {
         return null;
       }
-      return { lng: coordinates[0], lat: coordinates[1] };
+      const point = { lng: coordinates[0], lat: coordinates[1] };
+      // Garde-fou : un point à plus de 12 km du centre de Saint-Nazaire est une erreur de géocodage.
+      if (Math.hypot((point.lat - 47.2745) * 111, (point.lng + 2.2125) * 75) > 12) return null;
+      return point;
     } catch {
       // On tente le service suivant.
     }

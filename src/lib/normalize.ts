@@ -153,8 +153,14 @@ function detectFeatures(raw: RawListing): string[] {
   return [...features];
 }
 
-function slug(text: string): string {
-  return normalizeText(text).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+/** Empreinte courte et stable d'une adresse d'annonce (FNV-1a, 32 bits). */
+function fingerprint(text: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
 }
 
 /**
@@ -198,7 +204,9 @@ export function normalizeListing(raw: RawListing, today: string): Listing | null
     raw.furnished ?? (/\bmeuble/.test(normalized) && !/non meuble/.test(normalized));
 
   return {
-    id: `${raw.source}-${slug(raw.ref) || slug(raw.url)}`,
+    // L'adresse complète de l'annonce l'identifie de façon unique, même quand deux
+    // annonces d'un site finissent par le même segment (« …/18-location-appartement-st-nazaire-44600.htm »).
+    id: `${raw.source}-${fingerprint(raw.url || raw.ref)}`,
     source: raw.source,
     sourceLabel: raw.sourceLabel,
     url: raw.url,

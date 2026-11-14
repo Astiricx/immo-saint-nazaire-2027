@@ -113,11 +113,24 @@ async function main() {
     geocoded += 1;
     const point = await geocode(listing.address);
     if (point) collected[i] = withCoordinates(listing, point.lat, point.lng);
+    if (DEBUG) {
+      const trip = point ? evaluate(collected[i]).bikeMinutes : null;
+      console.log(
+        `  géocodage « ${listing.address} » → ${point ? `${point.lat}, ${point.lng} (${collected[i].districtId ?? 'hors quartier connu'}, ${trip} min)` : 'non trouvé'}`,
+      );
+    }
   }
 
   const { unique, removed } = dedupe(collected);
   const evaluated = unique.map((listing) => evaluate(listing));
   const accepted = evaluated.filter((l) => l.accepted);
+  if (DEBUG) {
+    for (const l of evaluated) {
+      console.log(
+        `  ${l.accepted ? 'RETENUE ' : 'écartée '} ${l.sourceLabel} | ${l.title.slice(0, 60)} | ${l.monthlyCost} € | ${l.bikeMinutes ?? '?'} min | ${l.rejections.map((r) => r.code).join(', ')}`,
+      );
+    }
+  }
   const rejectedCounts: Partial<Record<RejectionCode, number>> = {};
   for (const listing of evaluated.filter((l) => !l.accepted)) {
     for (const rejection of listing.rejections) {
@@ -128,11 +141,11 @@ async function main() {
   // On garde la date de première apparition, et les annonces d'une source en panne ce jour-là.
   const previousById = new Map((previous?.listings ?? []).map((l) => [l.id, l]));
   const failedSources = new Set(reports.filter((r) => r.status !== 'ok' && r.status !== 'inactive').map((r) => r.id));
-  const keptListings: Listing[] = accepted.map((evaluatedListing) => {
-    const { id } = evaluatedListing;
-    const listing = unique.find((l) => l.id === id) as Listing;
-    return { ...listing, firstSeen: previousById.get(id)?.firstSeen ?? today };
-  });
+  const byId = new Map(unique.map((l) => [l.id, l]));
+  const keptListings: Listing[] = accepted.map(({ id }) => ({
+    ...(byId.get(id) as Listing),
+    firstSeen: previousById.get(id)?.firstSeen ?? today,
+  }));
   const keptIds = new Set(keptListings.map((l) => l.id));
   for (const old of previous?.listings ?? []) {
     if (failedSources.has(old.collector ?? old.source) && !keptIds.has(old.id)) keptListings.push(old);

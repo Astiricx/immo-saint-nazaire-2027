@@ -171,8 +171,12 @@ export function findStreet(text: string): string | null {
 }
 
 export function findLocation(text: string): string {
+  // Saint-Marc-sur-Mer est un quartier de Saint-Nazaire (44600).
+  const marc = text.match(/(saint|st)[\s-]*marc[\s-]*sur[\s-]*mer\s*\(?\s*(\d{5})?/i);
+  if (marc) return `Saint-Nazaire (${marc[2] ?? '44600'}), Saint-Marc-sur-Mer`;
   const m = text.match(/(saint|st)[\s-]*nazaire\s*\(?\s*(\d{5})?\s*\)?/i);
   if (m) return `Saint-Nazaire${m[2] ? ` (${m[2]})` : ''}`;
+  if (/\b44600\b/.test(text)) return 'Saint-Nazaire (44600)';
   const other = text.match(/\b([A-ZÀ-Ý][A-Za-zÀ-ÿ'’ -]{2,40})\s*\((\d{5})\)/);
   return other ? `${other[1].trim()} (${other[2]})` : '';
 }

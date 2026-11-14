@@ -304,3 +304,13 @@ test('texte : attributs contenant « > » et découpe par liens', async () => {
   assert.deepEqual(segments.map((s) => s.href), ['https://x.fr/a/1', 'https://x.fr/a/2']);
   assert.match(segments[0].text, /520 € par mois/);
 });
+
+test('identifiants : deux annonces d’un même site ne se confondent jamais', () => {
+  const a = normalizeListing(raw({ url: 'https://www.fnaim.fr/annonce-immobiliere/53224796/18-location-appartement-st-nazaire-44600.htm', ref: '18-location-appartement-st-nazaire-44600' }), TODAY)!;
+  const b = normalizeListing(raw({ url: 'https://www.fnaim.fr/annonce-immobiliere/53234097/18-location-appartement-st-nazaire-44600.htm', ref: '18-location-appartement-st-nazaire-44600' }), TODAY)!;
+  assert.notEqual(a.id, b.id);
+  const marc = normalizeListing(raw({ title: 'Appartement 2 pièces 36m² ST MARC SUR MER 44600', locationText: extractFromText('ST MARC SUR MER 44600').locationText }), TODAY)!;
+  assert.equal(marc.postcode, '44600');
+  assert.equal(marc.districtId, 'saint-marc');
+  assert.deepEqual(evaluate(marc).rejections.map((r) => r.code), ['distance']);
+});
