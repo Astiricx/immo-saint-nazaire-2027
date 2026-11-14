@@ -314,3 +314,10 @@ test('identifiants : deux annonces d’un même site ne se confondent jamais', (
   assert.equal(marc.districtId, 'saint-marc');
   assert.deepEqual(evaluate(marc).rejections.map((r) => r.code), ['distance']);
 });
+
+test('géocodage : la rue trouvée doit correspondre à la rue demandée', async () => {
+  const { sameStreet } = await import('../scripts/lib/http');
+  assert.equal(sameStreet('Avenue de Penhouët', 'Avenue de Penhoët'), true);
+  assert.equal(sameStreet('Avenue de Penhouët', 'Avenue de Saint-Nazaire'), false);
+  assert.equal(sameStreet('98 AVENUE ALBERT DE MUN', 'Avenue Albert de Mun'), true);
+});

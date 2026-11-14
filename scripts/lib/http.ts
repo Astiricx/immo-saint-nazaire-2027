@@ -82,15 +82,37 @@ export async function fetchPage(url: string): Promise<string> {
   return response.text();
 }
 
+const GENERIC_WORDS = new Set(['avenue', 'boulevard', 'place', 'allee', 'impasse', 'chemin', 'route', 'quai', 'saint', 'nazaire', 'sainte']);
+
+const streetTokens = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z]+/)
+    .filter((t) => t.length >= 4 && !GENERIC_WORDS.has(t));
+
+/**
+ * La rue trouvée doit partager un mot avec la rue demandée (mêmes 4 premières lettres,
+ * pour tolérer « Penhouët » et « Penhoët »).
+ */
+export function sameStreet(asked: string, found: string): boolean {
+  const wanted = streetTokens(asked).map((t) => t.slice(0, 4));
+  const got = new Set(streetTokens(found).map((t) => t.slice(0, 4)));
+  return wanted.length > 0 && wanted.some((t) => got.has(t));
+}
+
 /**
  * Géocodage d'une adresse par le service public de la Géoplateforme (IGN),
  * avec repli sur l'ancienne API Adresse. Renvoie null si le résultat n'est pas fiable.
  */
 export async function geocode(address: string): Promise<{ lat: number; lng: number } | null> {
-  const query = encodeURIComponent(`${address}, 44600 Saint-Nazaire`);
+  // La commune est fixée par son code INSEE (44184) : ajouter « Saint-Nazaire » au texte
+  // ferait trouver l'« avenue de Saint-Nazaire » plutôt que la rue demandée.
+  const query = encodeURIComponent(address);
   const endpoints = [
-    `https://data.geopf.fr/geocodage/search?q=${query}&postcode=44600&limit=1`,
-    `https://api-adresse.data.gouv.fr/search/?q=${query}&postcode=44600&limit=1`,
+    `https://data.geopf.fr/geocodage/search?q=${query}&citycode=44184&type=street&limit=1`,
+    `https://api-adresse.data.gouv.fr/search/?q=${query}&citycode=44184&limit=1`,
   ];
   for (const endpoint of endpoints) {
     try {
@@ -102,7 +124,7 @@ export async function geocode(address: string): Promise<{ lat: number; lng: numb
       const json = (await response.json()) as {
         features?: {
           geometry?: { coordinates?: [number, number] };
-          properties?: { score?: number; postcode?: string; type?: string };
+          properties?: { score?: number; postcode?: string; type?: string; street?: string; name?: string };
         }[];
       };
       const feature = json.features?.[0];
@@ -113,6 +135,7 @@ export async function geocode(address: string): Promise<{ lat: number; lng: numb
       if ((props.score ?? 0) < 0.55 || props.postcode !== '44600' || props.type === 'municipality') {
         return null;
       }
+      if (!sameStreet(address, `${props.street ?? ''} ${props.name ?? ''}`)) return null;
       const point = { lng: coordinates[0], lat: coordinates[1] };
       // Garde-fou : un point à plus de 12 km du centre de Saint-Nazaire est une erreur de géocodage.
       if (Math.hypot((point.lat - 47.2745) * 111, (point.lng + 2.2125) * 75) > 12) return null;
