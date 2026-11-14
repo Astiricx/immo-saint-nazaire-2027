@@ -1,0 +1,74 @@
+name: Vérification et déploiement
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: read
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Tests et build
+    runs-on: ubuntu-latest
+    outputs:
+      pages: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+
+      - name: Tests de la logique (filtrage, score, trajet)
+        run: npm test
+
+      # Le déploiement ne se déclenche que si GitHub Pages est activé sur le dépôt
+      # (Settings > Pages > Source : GitHub Actions). Sinon le build est seulement vérifié.
+      - name: Détecter GitHub Pages
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" --silent 2>/dev/null; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GitHub Pages n'est pas activé : build vérifié, déploiement ignoré."
+          fi
+
+      - name: Build (typage + export statique)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.enabled == 'true' && format('/{0}', github.event.repository.name) || '' }}
+
+      - name: Préparer l'artefact Pages
+        if: steps.pages.outputs.enabled == 'true' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    name: Déploiement GitHub Pages
+    needs: build
+    if: needs.build.outputs.pages == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
