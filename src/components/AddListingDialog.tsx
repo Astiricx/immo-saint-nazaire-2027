@@ -36,7 +36,7 @@ const EMPTY_FORM: FormState = {
   description: '',
 };
 
-const TYPE_CHOICES: PropertyType[] = ['T2'];
+const TYPE_CHOICES: PropertyType[] = ['T2', 'T3+', 'maison', 'studio'];
 const DISTRICT_CHOICES = [...DISTRICTS].sort((a, b) =>
   a.name.localeCompare(b.name, 'fr'),
 );

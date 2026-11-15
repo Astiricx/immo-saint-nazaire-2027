@@ -1,10 +1,11 @@
+import { estimateApl } from '../../src/lib/apl';
 import { CRITERIA } from '../../src/lib/criteria';
 import type { RawListing } from '../../src/lib/types';
 import { PRIVATE_MODE } from '../lib/privacy';
 import type { ListingSource } from './types';
 
 /**
- * Grands portails (Leboncoin, SeLoger, Bien'ici) via Apify.
+ * Grands portails (Leboncoin, SeLoger, Bien'ici, PAP, Logic-Immo, ParuVendu) via Apify.
  *
  * Ces portails sont protégés contre les robots (DataDome). Les « Actors » Apify ci-dessous
  * passent ces protections avec des proxys résidentiels français et renvoient les annonces
@@ -21,7 +22,8 @@ import type { ListingSource } from './types';
 
 export interface ApifyActor {
   actorId: string;
-  input: Record<string, unknown>;
+  /** Une recherche, ou plusieurs (par exemple appartements puis maisons) dont les résultats s'additionnent. */
+  input: Record<string, unknown> | Record<string, unknown>[];
   /**
    * La recherche transmise à l'Actor filtre déjà sur « meublé » avec le filtre du portail :
    * une annonce sans mention contraire est alors considérée comme meublée.
@@ -38,6 +40,7 @@ export interface ApifyPortal {
 }
 
 const CITY = 'Saint-Nazaire';
+const POSTCODE = '44600';
 /** Plafond technique très au-dessus du nombre d'annonces possibles : aucune annonce n'est écartée faute de place. */
 const NO_LIMIT = 10000;
 const FR_RESIDENTIAL = {
@@ -47,11 +50,56 @@ const FR_RESIDENTIAL = {
 };
 
 /**
- * Recherche Leboncoin : locations, Saint-Nazaire (44600), appartements meublés de 2 pièces,
- * 25 m² minimum, 700 € maximum. C'est l'URL que le site lui-même produit avec ces filtres.
+ * Loyer affiché maximal demandé aux portails. Le plafond porte sur le loyer NET
+ * (charges comprises − aide au logement estimée) : on cherche donc jusqu'au plafond net
+ * plus l'aide maximale, arrondi aux 50 € supérieurs. Le filtrage exact se fait ensuite.
+ */
+export const SEARCH_MAX_RENT =
+  Math.ceil((CRITERIA.maxNetRent + estimateApl(CRITERIA.maxNetRent).amount) / 50) * 50;
+
+/** Identifiant de Saint-Nazaire (44600) sur les portails du groupe SeLoger / Logic-Immo. */
+const AVIV_LOCATION = 'AD08FR17295';
+
+/**
+ * Recherche Leboncoin : locations meublées à Saint-Nazaire (44600), maisons et appartements,
+ * 25 m² minimum, loyer affiché jusqu'à SEARCH_MAX_RENT. C'est l'URL que le site produit avec ces filtres.
  */
 export const LEBONCOIN_SEARCH_URL =
-  `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_44600&real_estate_type=2&furnished=1&rooms=2-2&square=${CRITERIA.minSurface}-max&price=min-${CRITERIA.maxRent}`;
+  `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_${POSTCODE}&real_estate_type=1,2&furnished=1&square=${CRITERIA.minSurface}-max&price=min-${SEARCH_MAX_RENT}`;
+
+export const SELOGER_SEARCH_URL =
+  `https://www.seloger.com/classified-search?distributionTypes=Rent&estateTypes=House,Apartment&locations=${AVIV_LOCATION}&priceMax=${SEARCH_MAX_RENT}&spaceMin=${CRITERIA.minSurface}`;
+
+export const LOGICIMMO_SEARCH_URL =
+  `https://www.logic-immo.com/classified-search?distributionTypes=Rent&estateTypes=House,Apartment&locations=${AVIV_LOCATION}&priceMax=${SEARCH_MAX_RENT}&spaceMin=${CRITERIA.minSurface}`;
+
+/** Toutes les locations PAP à Saint-Nazaire (le code g24084 est celui de la commune sur pap.fr). */
+export const PAP_SEARCH_URL = 'https://www.pap.fr/annonce/locations-saint-nazaire-44600-g24084';
+
+export const PARUVENDU_SEARCH_URLS = [
+  'https://www.paruvendu.fr/immobilier/location/appartement/meuble/saint-nazaire-44600/',
+  'https://www.paruvendu.fr/immobilier/location/appartement/saint-nazaire-44600/',
+  'https://www.paruvendu.fr/immobilier/location/maison/saint-nazaire-44600/',
+];
+
+/** Agrégateur multi-portails (PAP, Logic-Immo…) : sert de solution de repli. */
+const pigeImmo = (source: string, proxy: Record<string, unknown>): ApifyActor => ({
+  actorId: 'dltik/pige-immo-fr-scraper',
+  input: {
+    sources: [source],
+    transaction: 'rent',
+    cities: [CITY],
+    postalCodes: [POSTCODE],
+    propertyTypes: ['appartement', 'maison'],
+    priceMax: SEARCH_MAX_RENT,
+    surfaceMin: CRITERIA.minSurface,
+    maxResultsPerSource: NO_LIMIT,
+    enrichDpe: false,
+    dedupAcrossSources: false,
+    proxyConfig: proxy,
+  },
+  furnishedFilter: false,
+});
 
 export const APIFY_PORTALS: ApifyPortal[] = [
   {
@@ -61,7 +109,7 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     actors: [
       {
         actorId: 'data_alchemist/leboncoin',
-        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxResults: 1000, proxyConfiguration: FR_RESIDENTIAL },
+        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxResults: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: true,
       },
       {
@@ -74,8 +122,8 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         actorId: 'xtracto/leboncoin-listings',
         input: {
           category: '10',
-          locations: ['44600'],
-          priceMax: CRITERIA.maxRent,
+          locations: [POSTCODE],
+          priceMax: SEARCH_MAX_RENT,
           sortBy: 'time',
           maxResults: 0,
           proxyConfiguration: FR_RESIDENTIAL,
@@ -95,16 +143,23 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     domain: 'seloger.com',
     actors: [
       {
-        // Fonctionne sans offre payante ; sur l'offre gratuite d'Apify : 200 annonces et 10 exécutions maximum.
+        // Recherche filtrée (maisons et appartements, loyer, surface) : moins de résultats inutiles.
+        // Sur l'offre gratuite d'Apify, cet Actor plafonne à 200 annonces par exécution.
         actorId: 'lentic_clockss/seloger-property-scraper',
-        input: {
+        input: { startUrls: [{ url: SELOGER_SEARCH_URL }], channel: 'RENT', maxItems: 500, maxPages: 50, scrapeDetails: true },
+        furnishedFilter: false,
+      },
+      {
+        // Même Actor, recherche par ville : appartements puis maisons.
+        actorId: 'lentic_clockss/seloger-property-scraper',
+        input: ['appartement', 'maison'].map((propertyType) => ({
           location: 'saint-nazaire',
           channel: 'RENT',
-          propertyType: 'appartement',
+          propertyType,
           maxItems: 500,
           maxPages: 50,
           scrapeDetails: true,
-        },
+        })),
         furnishedFilter: false,
       },
       {
@@ -112,11 +167,10 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         actorId: 'abotapi/seloger-france-scraper',
         input: {
           mode: 'search',
-          locations: ['44600'],
+          locations: [POSTCODE],
           distributionType: 'Rent',
-          estateTypes: ['Apartment'],
-          priceMax: CRITERIA.maxRent,
-          roomsMin: 2,
+          estateTypes: ['Apartment', 'House'],
+          priceMax: SEARCH_MAX_RENT,
           spaceMin: CRITERIA.minSurface,
           sortBy: 'DateDesc',
           maxItems: 0,
@@ -132,11 +186,9 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         input: {
           transaction: 'rent',
           cities: [CITY],
-          postalCodes: ['44600'],
-          propertyTypes: ['apartment'],
-          priceMax: CRITERIA.maxRent,
-          roomsMin: 2,
-          roomsMax: 2,
+          postalCodes: [POSTCODE],
+          propertyTypes: ['apartment', 'house'],
+          priceMax: SEARCH_MAX_RENT,
           surfaceMin: CRITERIA.minSurface,
           maxResults: NO_LIMIT,
           proxyConfiguration: FR_RESIDENTIAL,
@@ -155,15 +207,98 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         input: {
           location: CITY,
           operation: 'rent',
-          maxPrice: CRITERIA.maxRent,
-          minRooms: 2,
-          maxRooms: 2,
+          maxPrice: SEARCH_MAX_RENT,
           minSurface: CRITERIA.minSurface,
           furnished: true,
           sortBy: 'relevance',
           maxItems: 0,
         },
         furnishedFilter: true,
+      },
+    ],
+  },
+  {
+    id: 'pap',
+    label: 'PAP',
+    domain: 'pap.fr',
+    actors: [
+      {
+        // Payé à l'annonce, proxys compris : fonctionne avec l'offre gratuite d'Apify.
+        actorId: 'tagadanar/french-real-estate-pap',
+        input: {
+          searchUrls: [PAP_SEARCH_URL],
+          maxPrice: SEARCH_MAX_RENT,
+          minSurface: CRITERIA.minSurface,
+          // Fiche complète : description entière (« meublé ») et rue.
+          scrapeDetails: true,
+          maxResults: 4000,
+          maxPagesPerUrl: 20,
+        },
+        furnishedFilter: false,
+      },
+      pigeImmo('pap', { useApifyProxy: true }),
+      {
+        actorId: 'scrapifier/pap-universal-scraper',
+        input: {
+          transaction: 'rent',
+          locations: [CITY],
+          property_types: ['appartement', 'maison'],
+          max_results: NO_LIMIT,
+          proxyConfiguration: FR_RESIDENTIAL,
+        },
+        furnishedFilter: false,
+      },
+    ],
+  },
+  {
+    id: 'logicimmo',
+    label: 'Logic-Immo',
+    domain: 'logic-immo.com',
+    actors: [
+      {
+        // Payé à l'annonce, proxys résidentiels compris.
+        actorId: 'tagadanar/french-real-estate-logicimmo',
+        input: {
+          searchUrls: [LOGICIMMO_SEARCH_URL],
+          maxPrice: SEARCH_MAX_RENT,
+          minSurface: CRITERIA.minSurface,
+          maxResults: 4000,
+          maxPagesPerUrl: 40,
+        },
+        furnishedFilter: false,
+      },
+      pigeImmo('logic_immo', FR_RESIDENTIAL),
+      {
+        actorId: 'studio-amba/logicimmo-scraper',
+        input: {
+          searchUrl: LOGICIMMO_SEARCH_URL,
+          listingType: 'rent',
+          searchQuery: 'saint-nazaire',
+          maxResults: NO_LIMIT,
+          scrapeDetails: true,
+          proxyConfiguration: FR_RESIDENTIAL,
+        },
+        furnishedFilter: false,
+      },
+    ],
+  },
+  {
+    id: 'paruvendu',
+    label: 'ParuVendu',
+    domain: 'paruvendu.fr',
+    actors: [
+      {
+        // Payé à l'annonce, proxys compris. La première recherche ne contient que des meublés.
+        actorId: 'tagadanar/french-real-estate-paruvendu',
+        input: {
+          searchUrls: PARUVENDU_SEARCH_URLS,
+          maxPrice: SEARCH_MAX_RENT,
+          minSurface: CRITERIA.minSurface,
+          scrapeDetails: true,
+          maxResults: 4000,
+          maxPagesPerUrl: 20,
+        },
+        furnishedFilter: false,
       },
     ],
   },
@@ -252,6 +387,84 @@ function chargesIncluded(item: Item): boolean | null {
   return null;
 }
 
+const FURNISHED_KEY = /furnish|meubl/i;
+
+/** Lit une valeur « meublé » : booléen, 1/0, « oui », « Meublé », « Non meublé », « Unfurnished »… */
+export function furnishedFromValue(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1 ? true : value === 0 || value === 2 ? false : null;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  if (/\bnon\b|unfurnished|\bvide\b|^\s*2\s*$|false|^\s*no\s*$/i.test(value)) return false;
+  if (/oui|yes|meubl|furnished|^\s*1\s*$|true/i.test(value)) return true;
+  return null;
+}
+
+/**
+ * Cherche l'état « meublé » partout dans un résultat : champ dédié à n'importe quelle profondeur
+ * (features.furnished, rawData.isFurnished…), ou étiquette « Meublé » dans une liste de caractéristiques.
+ * SeLoger, notamment, ne le donne que dans ses caractéristiques.
+ */
+export function findFurnished(item: unknown, depth = 0): boolean | null {
+  if (depth > 5 || item == null) return null;
+  if (Array.isArray(item)) {
+    let found: boolean | null = null;
+    for (const entry of item) {
+      if (typeof entry === 'string') {
+        if (/non[\s-]+meubl|unfurnished/i.test(entry)) return false;
+        if (/\bmeubl[ée]|\bfurnished\b/i.test(entry)) found = true;
+      } else {
+        const inner = findFurnished(entry, depth + 1);
+        if (inner === false) return false;
+        if (inner === true) found = true;
+      }
+    }
+    return found;
+  }
+  if (!isObject(item)) return null;
+  // Attribut « clé / valeur » : { key: 'furnished', value: '1' } ou { name: 'Meublé', value: true }.
+  const label = toText(item.key ?? item.name ?? item.label ?? item.type ?? item.code);
+  if (label && FURNISHED_KEY.test(label)) {
+    const own = furnishedFromValue(item.value ?? item.value_label ?? item.enabled ?? true);
+    if (own !== null) return /non|unfurnish/i.test(label) ? !own : own;
+  }
+  let found: boolean | null = null;
+  for (const [key, value] of Object.entries(item)) {
+    if (FURNISHED_KEY.test(key) && (typeof value !== 'object' || value === null)) {
+      const own = furnishedFromValue(value);
+      if (own !== null) {
+        if (/^(is)?(un|non)/i.test(key)) return !own;
+        return own;
+      }
+    }
+    if (value && typeof value === 'object') {
+      const inner = findFurnished(value, depth + 1);
+      if (inner === false) return false;
+      if (inner === true) found = true;
+    }
+  }
+  return found;
+}
+
+/** Étiquettes courtes des listes de caractéristiques (« Balcon », « Meublé », « Local à vélos »). */
+function featureLabels(item: Item): string[] {
+  const labels = new Set<string>();
+  const visit = (value: unknown, depth: number) => {
+    if (depth > 3 || value == null) return;
+    if (typeof value === 'string') {
+      if (value.length <= 40) labels.add(value.trim());
+    } else if (Array.isArray(value)) {
+      value.forEach((v) => visit(v, depth + 1));
+    } else if (isObject(value)) {
+      const text = toText(value.label ?? value.name ?? value.title ?? value.value);
+      if (text && text.length <= 40) labels.add(text);
+      // Objet de booléens : { balcony: true, furnished: false } → on garde les clés vraies.
+      for (const [key, v] of Object.entries(value)) if (v === true) labels.add(key);
+    }
+  };
+  for (const key of ['features', 'tags', 'keyFacts', 'amenities', 'characteristics', 'criteria']) visit(item[key], 0);
+  return [...labels].filter(Boolean);
+}
+
 /**
  * Convertit un résultat d'Actor en annonce brute. Les noms de champs varient d'un Actor
  * à l'autre : on essaie les plus courants. Renvoie null si le lien, le loyer ou la surface manque.
@@ -301,7 +514,7 @@ export function toRawListing(
   if (/studio/i.test(typeHint) && !/studio/i.test(title)) title = `Studio - ${title}`;
 
   const city = toText(first(item, ['location.city_label', 'location.city', 'city', 'address.city', 'address.addressLocality', 'locality']));
-  const postcode = toText(first(item, ['location.zipcode', 'postalCode', 'zipcode', 'zipCode', 'postcode', 'address.postalCode']));
+  const postcode = toText(first(item, ['location.zipcode', 'postalCode', 'postal_code', 'zipcode', 'zipCode', 'postcode', 'address.postalCode']));
   const district = toText(first(item, ['district.name', 'district', 'location.district', 'neighborhood', 'neighbourhood', 'quartier']));
   const street = toText(first(item, ['address.street', 'address.streetAddress', 'street', 'streetAddress']));
 
@@ -312,16 +525,7 @@ export function toRawListing(
   const lng = addressKnown ? toNumber(first(item, ['longitude', 'lng', 'lon', 'location.lng', 'blurInfo.position.lon', 'position.lon', 'coordinates.lng'])) : null;
 
   const furnishedValue = first(item, ['furnished', 'isFurnished', 'is_furnished', 'furnishedStatus']) ?? attributeLabel(item, 'furnished');
-  let furnished: boolean | null =
-    typeof furnishedValue === 'boolean'
-      ? furnishedValue
-      : typeof furnishedValue === 'string' && furnishedValue
-        ? /non|unfurnished|vide|\b2\b|false/i.test(furnishedValue)
-          ? false
-          : /oui|yes|meubl[ée]|furnished|\b1\b|true/i.test(furnishedValue)
-            ? true
-            : null
-        : null;
+  let furnished: boolean | null = furnishedFromValue(furnishedValue) ?? findFurnished(item);
   // La recherche filtrait déjà sur « meublé » : sans indication contraire, l'annonce l'est.
   if (furnished === null && furnishedFilter) furnished = true;
 
@@ -335,7 +539,13 @@ export function toRawListing(
     ref,
     url: url.split('#')[0],
     title,
-    description: toText(first(item, ['body', 'description', 'text', 'summary'])),
+    description: [
+      toText(first(item, ['body', 'description', 'text', 'summary'])),
+      toText(first(item, ['headline', 'subtitle'])),
+      featureLabels(item).join(' · '),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     priceText,
     surfaceText: `${surface} m²`,
     locationText: [city || CITY, postcode ? `(${postcode})` : '', district ? `, ${district}` : ''].join(' ').replace(' ,', ',').trim(),
@@ -386,10 +596,29 @@ function httpHint(status: number, actorId: string): string {
   return `HTTP ${status}`;
 }
 
+/** Chemins des champs dont le nom évoque « meublé » : vérifie la lecture sans rien dévoiler des annonces. */
+function furnishedPaths(items: Item[]): string {
+  const counts = new Map<string, number>();
+  const visit = (value: unknown, path: string, depth: number) => {
+    if (depth > 4 || !value || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      value.slice(0, 50).forEach((v) => visit(v, `${path}[]`, depth + 1));
+      return;
+    }
+    for (const [key, v] of Object.entries(value)) {
+      const next = path ? `${path}.${key}` : key;
+      if (FURNISHED_KEY.test(key)) counts.set(next, (counts.get(next) ?? 0) + 1);
+      visit(v, next, depth + 1);
+    }
+  };
+  items.forEach((item) => visit(item, '', 0));
+  return [...counts.entries()].map(([k, n]) => `${k}:${n}`).join(' ') || 'aucun';
+}
+
 /** Lance un Actor, attend la fin de l'exécution et renvoie tout son jeu de données. */
-export async function runActor(actor: ApifyActor): Promise<Item[]> {
+export async function runActor(actor: ApifyActor, input: Record<string, unknown>): Promise<Item[]> {
   const id = actor.actorId.replace('/', '~');
-  const start = await apify(`/acts/${id}/runs`, { method: 'POST', body: JSON.stringify(actor.input) });
+  const start = await apify(`/acts/${id}/runs`, { method: 'POST', body: JSON.stringify(input) });
   if (!start.ok) {
     const detail = (await start.text()).slice(0, 200).replace(/\s+/g, ' ');
     throw new Error(`${httpHint(start.status, actor.actorId)} — ${detail}`);
@@ -438,20 +667,31 @@ export function apifySource(portal: ApifyPortal): ListingSource {
     async fetch(debug) {
       const failures: string[] = [];
       for (const actor of portal.actors) {
-        let items: Item[];
-        try {
-          items = await runActor(actor);
-        } catch (error) {
-          const message = (error as Error).message;
-          console.log(`  ${actor.actorId} : ${message}`);
-          failures.push(`${actor.actorId} : ${message.split(' — ')[0]}`);
+        const items: Item[] = [];
+        let lastError: string | null = null;
+        for (const input of Array.isArray(actor.input) ? actor.input : [actor.input]) {
+          try {
+            items.push(...(await runActor(actor, input)));
+          } catch (error) {
+            lastError = (error as Error).message;
+            console.log(`  ${actor.actorId} : ${lastError}`);
+          }
+        }
+        if (items.length === 0 && lastError) {
+          failures.push(`${actor.actorId} : ${lastError.split(' — ')[0]}`);
           continue;
         }
         const listings = items
           .map((item) => toRawListing(item, portal, actor.furnishedFilter))
           .filter((l): l is RawListing => l !== null);
         console.log(`  ${actor.actorId} : ${items.length} résultat(s), ${listings.length} converti(s)`);
-        if (debug) console.log(`  champs présents : ${fieldCoverage(items)}`);
+        if (debug) {
+          const states = { oui: 0, non: 0, inconnu: 0 };
+          for (const l of listings) states[l.furnished === true ? 'oui' : l.furnished === false ? 'non' : 'inconnu'] += 1;
+          console.log(`  champs présents : ${fieldCoverage(items)}`);
+          console.log(`  champs « meublé » : ${furnishedPaths(items)}`);
+          console.log(`  meublé lu dans les données : ${states.oui} oui, ${states.non} non, ${states.inconnu} non précisé`);
+        }
         if (listings.length === 0) {
           failures.push(`${actor.actorId} : ${items.length} résultat(s), aucun exploitable`);
           continue;

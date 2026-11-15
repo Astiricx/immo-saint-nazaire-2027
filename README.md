@@ -1,6 +1,6 @@
 # Saint-Nazaire 2027
 
-Tableau de bord pour trouver un **T2 meublé à Saint-Nazaire**, à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
+Tableau de bord pour trouver un **logement meublé à Saint-Nazaire** (T2, T3, T4 ou maison), à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
 
 Chaque matin, une GitHub Action collecte les annonces de location (grands portails, agences, alertes e-mail), écarte celles qui sortent des critères, publie le résultat **chiffré** dans `public/listings.enc.json` et republie le site. Le site déchiffre ce fichier avec votre phrase secrète.
 
@@ -10,12 +10,13 @@ Site : <https://astiricx.github.io/immo-saint-nazaire-2027/>
 
 | Critère | Règle |
 | --- | --- |
-| Type de bien | **T2 uniquement.** Studios, T1, colocations, chambres, T3 et plus, maisons, parkings écartés. |
-| Surface | **25 m² minimum.** |
+| Type de bien | **T2, T3, T4 et plus, maisons.** Colocations, chambres, parkings et locaux écartés. Un studio n'est écarté que s'il fait moins de 25 m². |
+| Surface | **25 m² minimum**, pour tous les types de bien. |
 | Meublé | **Impératif.** Toute annonce qui n'est pas clairement meublée est écartée : « non meublé » ou « vide », mais aussi une annonce muette sur ce point. |
-| Loyer | 700 € charges comprises maximum : au-delà, l'annonce est écartée. Le budget idéal de 550 € est comparé au **loyer net**, après aide au logement estimée. |
+| Loyer | **600 € net maximum** : loyer charges comprises − aide au logement estimée ≤ 600 €. Le loyer affiché peut donc dépasser 600 € (jusqu'à 760 € environ pour un T2) si l'aide le ramène en dessous. Budget idéal : 500 € net. |
 | Commune | Saint-Nazaire (44600) uniquement. |
-| Trajet | 20 minutes à vélo au maximum jusqu'aux Chantiers, quand l'annonce permet de situer le logement. |
+| Secteurs | Centre-ville, front de mer prolongé par la piste cyclable du littoral (Villès-Martin, Kerlédé, Rocher du Lion) et Parc paysager : meilleure note de secteur. |
+| Trajet | 30 minutes à vélo au maximum jusqu'aux Chantiers, quand l'annonce permet de situer le logement : jusqu'un peu après le Rocher du Lion par le front de mer. |
 | Disponibilité | Janvier 2027 ou fin 2026 : compte dans le score, n'écarte pas l'annonce. |
 
 Seules les annonces conformes sont publiées. Une annonce qui ne précise ni rue ni quartier est conservée avec la mention « trajet à vérifier » plutôt que d'être écartée à tort.
@@ -26,12 +27,12 @@ Les seuils se règlent dans [`src/lib/criteria.ts`](src/lib/criteria.ts).
 
 | Source | Fonctionnement | Activation |
 | --- | --- | --- |
-| Leboncoin, SeLoger, Bien'ici | Via des Actors [Apify](https://apify.com), qui passent les protections anti-robots avec des proxys résidentiels français. Payé au résultat. | Secrets `APIFY_TOKEN` **et** `LISTINGS_PASSPHRASE` |
+| Leboncoin, SeLoger, Bien'ici, PAP, Logic-Immo, ParuVendu | Via des Actors [Apify](https://apify.com), qui passent les protections anti-robots avec des proxys résidentiels français. Payé au résultat. | Secrets `APIFY_TOKEN` **et** `LISTINGS_PASSPHRASE` |
 | Alertes e-mail des portails | Lit, en lecture seule, les alertes de Leboncoin, SeLoger, Bien'ici, PAP, Logic-Immo, Ouest-France Immo, ParuVendu, LocService et Jinka reçues ces 4 derniers jours. | Secrets `IMAP_USER` et `IMAP_PASSWORD` |
-| Sites d'agences et Ouest-France Immo | Square Habitat, Foncia, FNAIM, Laforêt, Ouest-France Immo : page de résultats Saint-Nazaire, puis chaque fiche, en respectant `robots.txt`. | Active par défaut |
+| Sites d'agences, LocService, Ouest-France Immo | Square Habitat, Foncia, FNAIM, LocService, Laforêt, Ouest-France Immo : pages de résultats Saint-Nazaire, puis chaque fiche, en respectant `robots.txt`. Les biens marqués « Loué » sur LocService sont ignorés. | Active par défaut |
 | Flux JSON | Toute adresse qui renvoie un tableau d'annonces au format de [`json-feed.ts`](scripts/sources/json-feed.ts). | Variable `FEED_URLS` |
 
-Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion) est affiché en bas du site et sur la page de l'exécution, dans l'onglet *Actions*.
+Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion, y compris par source) est affiché en bas du site et sur la page de l'exécution, dans l'onglet *Actions*.
 
 ### Activer les grands portails
 
@@ -40,7 +41,7 @@ Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion
 3. **Jeton.** Ajoutez le secret `APIFY_TOKEN` de la même façon.
 4. Lancez la collecte : *Actions > Collecte quotidienne des annonces > Run workflow*.
 
-Aucune limite de volume : chaque portail renvoie toutes les annonces de la recherche (Saint-Nazaire, meublé quand le portail le permet, 1 ou 2 pièces, 700 € maximum). Les Actors sont payés au résultat, de un à quelques dollars pour mille annonces, plus le trafic des proxys résidentiels. Votre consommation est visible dans la console Apify.
+Aucune limite de volume : chaque portail renvoie toutes les annonces de la recherche (Saint-Nazaire, maisons et appartements, 25 m² minimum, meublé quand le portail le permet, loyer affiché jusqu'à 800 €, soit le plafond net plus l'aide maximale). Les Actors sont payés au résultat, de un à quelques dollars pour mille annonces, plus le trafic des proxys résidentiels. Votre consommation est visible dans la console Apify.
 
 Chaque portail a plusieurs Actors candidats, listés dans [`scripts/sources/apify.ts`](scripts/sources/apify.ts) et essayés dans l'ordre : le premier qui renvoie des annonces exploitables est retenu, et le bilan de la collecte indique lequel. Ces Actors sont publiés par des tiers et peuvent disparaître : ajoutez-en un à la liste (`actorId` et `input`) si besoin. La conversion des résultats accepte les noms de champs courants.
 
@@ -58,7 +59,7 @@ Ce dispositif réduit le risque, il ne le supprime pas : la collecte automatisé
 
 ### Activer les alertes e-mail
 
-1. Sur les portails, lancez une recherche « location, Saint-Nazaire, appartement, 700 € max » et créez une alerte e-mail quotidienne.
+1. Sur les portails, lancez une recherche « location, Saint-Nazaire, meublé, 800 € max » et créez une alerte e-mail quotidienne.
 2. Créez un mot de passe d'application Gmail : *Compte Google > Sécurité > Validation en deux étapes > Mots de passe des applications*.
 3. Ajoutez les secrets `IMAP_USER` (votre adresse Gmail) et `IMAP_PASSWORD` (le mot de passe d'application). Pour une autre messagerie, ajoutez aussi `IMAP_HOST`.
 
@@ -106,7 +107,7 @@ L'estimation applique le barème officiel des aides personnelles au logement (AP
 
 - **Ressources :** pour un étudiant, la CAF ne retient pas les revenus réels mais un forfait annuel, même sans aucun revenu : 8 600 € pour un non-boursier, 6 900 € pour un boursier.
 - **Zone :** zone 3 par défaut. L'agglomération de Saint-Nazaire dépasse 100 000 habitants, ce qui correspond normalement à la zone 2. La zone 3 est le choix prudent : environ 17 € d'aide en moins par mois.
-- **Résultat :** environ 186 € par mois en zone 3 (203 € en zone 2), quasi identique pour toutes les annonces. Le loyer retenu par la CAF est plafonné à 275 € hors charges, et vos T2 le dépassent tous.
+- **Résultat :** environ 186 € par mois en zone 3 (203 € en zone 2), quasi identique pour toutes les annonces. Le loyer retenu par la CAF est plafonné à 275 € hors charges (personne seule, quel que soit le nombre de pièces). Au-delà de 688 € hors charges, l'aide diminue, puis s'annule vers 850 € hors charges : c'est pourquoi le plafond de 600 € net correspond à environ 760 € charges comprises.
 
 Le profil (zone, boursier, ressources) se règle dans `housingAid`, dans [`src/lib/criteria.ts`](src/lib/criteria.ts), et le barème dans [`src/lib/apl.ts`](src/lib/apl.ts). C'est une estimation : seule la CAF fixe le droit, sur son simulateur. Depuis le 1er juillet 2026, certains étudiants étrangers non boursiers n'y ont plus droit.
 
@@ -114,13 +115,13 @@ Le profil (zone, boursier, ressources) se règle dans `housingAid`, dans [`src/l
 
 | Critère | Points | Barème |
 | --- | --- | --- |
-| Loyer net | 40 | Loyer après aide au logement estimée : 40 points jusqu'à 350 €, 32 au budget idéal de 550 €, puis dégressif jusqu'à 8 à 700 € |
-| Trajet à vélo | 25 | Maximum jusqu'à 8 minutes, dégressif jusqu'à 20 ; 10 points si l'adresse n'est pas précisée |
-| Secteur | 15 | Centre-ville ou front de mer 15, quartier voisin 8, non précisé 5 |
+| Loyer net | 40 | Loyer après aide au logement estimée : 40 points jusqu'à 300 €, 32 au budget idéal de 500 €, puis dégressif jusqu'à 8 à 600 € |
+| Trajet à vélo | 25 | Maximum jusqu'à 8 minutes, dégressif jusqu'à 30 ; 10 points si l'adresse n'est pas précisée |
+| Secteur | 15 | Centre-ville, front de mer jusqu'au Rocher du Lion ou Parc paysager 15, quartier voisin 8, non précisé 5 |
 | Disponibilité | 10 | Maximum entre le 1er décembre 2026 et le 31 janvier 2027 |
 | Confort | 10 | Surface, charges comprises, meublé, local vélo |
 
-Quand une annonce donne une rue, elle est géocodée par le service public de la Géoplateforme (IGN). Le trajet est estimé à partir de la distance à vol d'oiseau jusqu'à l'entrée des Chantiers côté Penhoët, majorée de 30 % pour contourner les bassins, à 15 km/h, plus 2 minutes. C'est un ordre de grandeur pour trier : vérifiez l'itinéraire réel.
+Quand une annonce donne une rue, elle est géocodée par le service public de la Géoplateforme (IGN). Le trajet est estimé à partir de la distance à vol d'oiseau jusqu'à l'entrée des Chantiers côté Penhoët, majorée de 30 % pour contourner les bassins, à 16 km/h (piste cyclable plate et continue), plus 2 minutes. C'est un ordre de grandeur pour trier : vérifiez l'itinéraire réel.
 
 ## Structure
 

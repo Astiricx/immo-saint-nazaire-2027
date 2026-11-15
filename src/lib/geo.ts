@@ -24,7 +24,11 @@ export const SHIPYARD = {
 export const BIKE = {
   /** Le trajet réel contourne les bassins du port : distance à vol d'oiseau × 1,3. */
   detourFactor: 1.3,
-  speedKmh: 15,
+  /**
+   * Allure d'un trajet quotidien sur piste cyclable continue et plate (front de mer, centre) :
+   * 16 km/h, feux compris dans les minutes fixes.
+   */
+  speedKmh: 16,
   /** Feux, antivol, traversée du site. */
   fixedMinutes: 2,
 };
@@ -86,10 +90,10 @@ export const DISTRICTS: District[] = [
   {
     id: 'parc-paysager',
     name: 'Parc paysager',
-    zone: 'proche',
+    zone: 'coeur',
     lat: 47.2795,
     lng: -2.2255,
-    keywords: ['parc paysager'],
+    keywords: ['parc paysager', 'leo lagrange'],
   },
   {
     id: 'petit-caporal',
@@ -123,21 +127,31 @@ export const DISTRICTS: District[] = [
     lng: -2.23,
     keywords: ['sautron'],
   },
-  {
-    id: 'kerlede',
-    name: 'Kerlédé',
-    zone: 'eloigne',
-    lat: 47.269,
-    lng: -2.244,
-    keywords: ['kerlede'],
-  },
+  // Le front de mer se prolonge vers l'ouest par la piste cyclable du littoral :
+  // Villès-Martin, Kerlédé, puis le Rocher du Lion et Belle Fontaine.
   {
     id: 'villes-martin',
     name: 'Villès-Martin',
-    zone: 'eloigne',
-    lat: 47.2585,
-    lng: -2.2395,
-    keywords: ['villes martin'],
+    zone: 'coeur',
+    lat: 47.2605,
+    lng: -2.229,
+    keywords: ['villes martin', 'ville martin'],
+  },
+  {
+    id: 'kerlede',
+    name: 'Kerlédé',
+    zone: 'coeur',
+    lat: 47.2572,
+    lng: -2.238,
+    keywords: ['kerlede', 'ker villes'],
+  },
+  {
+    id: 'rocher-du-lion',
+    name: 'Rocher du Lion',
+    zone: 'coeur',
+    lat: 47.2562,
+    lng: -2.2426,
+    keywords: ['rocher du lion', 'belle fontaine', 'kerloupiots', 'avocettes'],
   },
   {
     id: 'immaculee',

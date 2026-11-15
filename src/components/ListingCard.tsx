@@ -50,9 +50,9 @@ export function ListingCard({
               ? `par mois, dont ${euro(l.estimatedCharges)} de charges estimées`
               : `par mois, dont ${euro(l.estimatedCharges)} de charges`}
         </p>
-        <LoadLine cost={l.monthlyCost} />
-        <div className="mt-3">
-          <NetRent listing={l} />
+        <NetRent listing={l} />
+        <div className="mt-2.5">
+          <LoadLine cost={l.netCost} />
         </div>
       </div>
 

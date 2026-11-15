@@ -14,6 +14,8 @@ export interface AgencySite {
   detailPattern: RegExp;
   /** Nombre maximal de fiches lues par passage. */
   maxDetails?: number;
+  /** Carte de la page de résultats à ignorer (bien déjà loué…). */
+  skipCard?: RegExp;
 }
 
 /**
@@ -50,6 +52,18 @@ export const AGENCY_SITES: AgencySite[] = [
     label: 'Ouest-France Immo',
     searchUrls: ['https://www.ouestfrance-immo.com/louer/appartement/saint-nazaire-44-44184/'],
     detailPattern: /\/immobilier\/location\/[^?#]*\d{6,}|\/annonce[^?#]*\d{6,}/i,
+  },
+  {
+    // Particuliers et « logements partenaires ». Les pages listent aussi les communes voisines :
+    // seules les fiches de Saint-Nazaire sont ouvertes.
+    id: 'locservice',
+    label: 'LocService',
+    searchUrls: [
+      'https://www.locservice.fr/loire-atlantique-44/location-st-nazaire.html',
+      ...[2, 3, 4, 5, 6, 7, 8].map((n) => `https://www.locservice.fr/loire-atlantique-44/location-st-nazaire-p${n}.html`),
+    ],
+    detailPattern: /^\/loire-atlantique-44\/location-[a-z0-9-]+-st-nazaire\/(p-[a-z]+-)?\d+(\.html)?$/i,
+    skipCard: /(^|\n)\s*Lou[ée]\s*(\n|$)/i,
   },
   {
     id: 'laforet',
@@ -96,6 +110,8 @@ export function agencySource(site: AgencySite): ListingSource {
             }
           }
         } catch (error) {
+          // Page de résultats au-delà de la dernière : rien à signaler.
+          if (searchUrl !== site.searchUrls[0] && /HTTP 404/.test((error as Error).message)) continue;
           lastError = error;
           notes.push(`${new URL(searchUrl).pathname} : ${(error as Error).message}`);
         }
@@ -127,6 +143,16 @@ export function agencySource(site: AgencySite): ListingSource {
         }
         return toRawListing(extracted, meta(url));
       };
+
+      let skipped = 0;
+      if (site.skipCard) {
+        for (const [url, card] of cards) {
+          if (site.skipCard.test(card)) {
+            detailUrls.delete(url);
+            skipped += 1;
+          }
+        }
+      }
 
       for (const url of [...detailUrls].slice(0, max)) {
         // Une autre ville du même nom (Saint-Nazaire, 66) ou une ville voisine : inutile d'ouvrir la fiche.
@@ -161,6 +187,7 @@ export function agencySource(site: AgencySite): ListingSource {
         else unreadable += 1;
       }
 
+      if (skipped > 0) notes.push(`${skipped} annonce(s) déjà louée(s) ignorée(s)`);
       if (detailUrls.size > max) notes.push(`${detailUrls.size - max} fiches au-delà de la limite`);
       if (notAllowed > 0) notes.push(`${notAllowed} fiche(s) fermée(s) aux robots par le site`);
       if (fromCards > 0) notes.push(`${fromCards} annonce(s) lue(s) sur la page de résultats`);

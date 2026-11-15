@@ -8,7 +8,7 @@
  * → filtrage strict (src/lib/evaluate.ts) → publication.
  * Seules les annonces conformes aux critères sont publiées :
  *   - avec le secret LISTINGS_PASSPHRASE : public/listings.enc.json, chiffré (portails inclus) ;
- *   - sans : public/listings.json, en clair, sans les portails (Leboncoin, SeLoger, Bien'ici).
+ *   - sans : public/listings.json, en clair, sans les portails (Leboncoin, SeLoger, Bien'ici, PAP…).
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -35,7 +35,7 @@ const PLAIN_OUTPUT = resolve(process.cwd(), 'public/listings.json');
 const ENCRYPTED_OUTPUT = resolve(process.cwd(), 'public/listings.enc.json');
 const DEBUG = process.argv.includes('--debug') || process.env.COLLECT_DEBUG === '1';
 const LOG_CONTENT = canLogContent(DEBUG);
-const MAX_GEOCODES = 80;
+const MAX_GEOCODES = 300;
 
 const SOURCES: ListingSource[] = [
   ...APIFY_PORTALS.map(apifySource),
@@ -47,7 +47,7 @@ const SOURCES: ListingSource[] = [
 const REASON_LABELS: Record<RejectionCode, string> = {
   colocation: 'colocation',
   type: 'type de bien',
-  surface: 'moins de 25 m²',
+  surface: `moins de ${CRITERIA.minSurface} m²`,
   meuble: 'non meublé',
   budget: 'hors budget',
   distance: 'trop loin à vélo',
@@ -151,11 +151,28 @@ async function main() {
     }
   }
   const rejectedCounts: Partial<Record<RejectionCode, number>> = {};
-  for (const listing of evaluated.filter((l) => !l.accepted)) {
+  /** Motifs d'exclusion par source : des comptes seulement, jamais le contenu des annonces. */
+  const bySource = new Map<string, { read: number; kept: number; reasons: Partial<Record<RejectionCode, number>> }>();
+  for (const listing of evaluated) {
+    const key = listing.collector ?? listing.source;
+    const entry = bySource.get(key) ?? { read: 0, kept: 0, reasons: {} };
+    entry.read += 1;
+    if (listing.accepted) entry.kept += 1;
     for (const rejection of listing.rejections) {
+      entry.reasons[rejection.code] = (entry.reasons[rejection.code] ?? 0) + 1;
       rejectedCounts[rejection.code] = (rejectedCounts[rejection.code] ?? 0) + 1;
     }
+    bySource.set(key, entry);
   }
+  const breakdown = [...bySource.entries()].map(([id, e]) => {
+    const label = reports.find((r) => r.id === id)?.label ?? id;
+    const reasons = Object.entries(e.reasons)
+      .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+      .map(([code, n]) => `${n} ${REASON_LABELS[code as RejectionCode]}`)
+      .join(', ');
+    return `${label} : ${e.kept} retenue(s) sur ${e.read}${reasons ? ` — motifs : ${reasons}` : ''}`;
+  });
+  console.log(`\nPar source (une annonce peut cumuler plusieurs motifs) :\n${breakdown.map((l) => `  ${l}`).join('\n')}`);
 
   // On garde la date de première apparition, et les annonces d'une source en panne ce jour-là.
   const previousById = new Map((previous?.listings ?? []).map((l) => [l.id, l]));
@@ -203,7 +220,7 @@ async function main() {
 
   const rejectedTotal = evaluated.length - accepted.length;
   const lines = [
-    `Critères : studio ou T2 sans colocation, ${euro(CRITERIA.maxRent)} maximum charges comprises, ${CRITERIA.maxBikeMinutes} min à vélo des Chantiers.`,
+    `Critères : meublé, ${CRITERIA.minSurface} m² minimum (T2, T3, T4, maison), sans colocation, ${euro(CRITERIA.maxNetRent)} net maximum après aide au logement estimée, ${CRITERIA.maxBikeMinutes} min à vélo des Chantiers.`,
     `${collected.length} annonce(s) collectée(s), ${removed} doublon(s), ${unreadable} illisible(s).`,
     `${keptListings.length} retenue(s), ${rejectedTotal} écartée(s)${
       rejectedTotal
@@ -223,7 +240,7 @@ async function main() {
       .join('\n');
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `## Collecte du ${today}\n\n${lines.join('\n\n')}\n\n| Source | État | Lues | Retenues | Note |\n| --- | --- | --- | --- | --- |\n${table}\n`,
+      `## Collecte du ${today}\n\n${lines.join('\n\n')}\n\n| Source | État | Lues | Retenues | Note |\n| --- | --- | --- | --- | --- |\n${table}\n\n### Motifs d'exclusion par source\n\n${breakdown.map((l) => `- ${l}`).join('\n')}\n`,
     );
   }
 }

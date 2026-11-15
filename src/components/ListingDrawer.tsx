@@ -100,10 +100,10 @@ export function ListingDrawer({
               <TierTag tier={l.budgetTier} />
             </div>
             <div className="mt-4">
-              <LoadLine cost={l.monthlyCost} showScale />
-            </div>
-            <div className="mt-4">
               <NetRent listing={l} size="lg" />
+            </div>
+            <div className="mt-3">
+              <LoadLine cost={l.netCost} showScale />
             </div>
 
             <ul className="mt-5 grid gap-2.5 text-sm sm:grid-cols-2">

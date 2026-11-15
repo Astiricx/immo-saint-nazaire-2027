@@ -122,9 +122,6 @@ export function ListingsTable({
                   <span className="w-16 shrink-0 whitespace-nowrap font-display text-xl font-semibold leading-none tabular-nums">
                     {euro(l.monthlyCost)}
                   </span>
-                  <div className="w-28">
-                    <LoadLine cost={l.monthlyCost} />
-                  </div>
                   {l.costIsEstimated ? <span className="text-xs text-muted">estimé</span> : null}
                 </div>
               </td>
@@ -133,6 +130,9 @@ export function ListingsTable({
                   {euro(l.netCost)}
                 </span>
                 <span className="block text-xs text-muted">aide {euro(l.housingAid)}</span>
+                <div className="ml-auto mt-1.5 w-24">
+                  <LoadLine cost={l.netCost} />
+                </div>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
                 {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'À vérifier'}

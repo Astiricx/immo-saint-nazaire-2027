@@ -86,7 +86,7 @@ function RangeField({
 }
 
 const ZONE_OPTIONS: { id: ZoneFilter; label: string }[] = [
-  { id: 'coeur', label: 'Centre et front de mer' },
+  { id: 'coeur', label: 'Secteurs visés' },
   { id: 'all', label: 'Tous les quartiers' },
 ];
 
@@ -179,11 +179,11 @@ export function FiltersBar({
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-t border-line p-3">
         <RangeField
           id="loyer-max"
-          label="Loyer maximum"
-          valueLabel={euro(filters.maxCost)}
-          value={filters.maxCost}
-          min={400}
-          max={CRITERIA.maxRent}
+          label="Loyer net maximum"
+          valueLabel={euro(Math.min(filters.maxCost, CRITERIA.maxNetRent))}
+          value={Math.min(filters.maxCost, CRITERIA.maxNetRent)}
+          min={300}
+          max={CRITERIA.maxNetRent}
           step={10}
           onChange={(value) => set('maxCost', value)}
         />
@@ -193,7 +193,7 @@ export function FiltersBar({
           valueLabel={`${Math.max(filters.minSurface, CRITERIA.minSurface)} m²`}
           value={Math.max(filters.minSurface, CRITERIA.minSurface)}
           min={CRITERIA.minSurface}
-          max={60}
+          max={100}
           step={5}
           onChange={(value) => set('minSurface', value)}
         />

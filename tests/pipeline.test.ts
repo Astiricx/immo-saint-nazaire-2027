@@ -206,13 +206,17 @@ test('normalisation : localisation par quartier, par coordonnées ou inconnue', 
   assert.ok(detectDistrict('Saint-Nazaire (44600), Méan-Penhoët')?.id === 'mean-penhoet');
 });
 
-test('le centre-ville et le front de mer sont à moins de 20 min à vélo des Chantiers', () => {
-  for (const id of ['centre-ville', 'front-de-mer', 'ville-port', 'petit-maroc', 'gare']) {
+test('centre-ville, Parc paysager et front de mer jusqu’au Rocher du Lion : 30 min à vélo au plus', () => {
+  for (const id of ['centre-ville', 'front-de-mer', 'ville-port', 'petit-maroc', 'gare', 'parc-paysager', 'villes-martin', 'kerlede', 'rocher-du-lion']) {
     const d = getDistrict(id)!;
     assert.ok(bikeTrip(d.lat, d.lng).minutes <= CRITERIA.maxBikeMinutes, d.name);
   }
   const saintMarc = getDistrict('saint-marc')!;
   assert.ok(bikeTrip(saintMarc.lat, saintMarc.lng).minutes > CRITERIA.maxBikeMinutes);
+  // Un peu après le Rocher du Lion, toujours dans les 30 min.
+  assert.ok(bikeTrip(47.2552, -2.2465).minutes <= CRITERIA.maxBikeMinutes);
+  assert.equal(getDistrict('parc-paysager')!.zone, 'coeur');
+  assert.equal(detectDistrict('Appartement chemin du Rocher du Lion')?.id, 'rocher-du-lion');
 });
 
 test('coût mensuel ramené charges comprises', () => {
@@ -225,10 +229,16 @@ test('coût mensuel ramené charges comprises', () => {
 test('filtrage strict : colocation, budget, type, distance, commune', () => {
   const codes = (l: Listing) => evaluate(l).rejections.map((r) => r.code);
   assert.deepEqual(codes(listing()), []);
-  assert.deepEqual(codes(listing({ rent: 700 })), []);
-  assert.deepEqual(codes(listing({ rent: 701 })), ['budget']);
+  // Le plafond porte sur le loyer net : un loyer affiché de 750 € passe grâce à l'aide.
+  assert.deepEqual(codes(listing({ rent: 750 })), []);
+  assert.deepEqual(codes(listing({ rent: 850 })), ['budget']);
+  for (let rent = 700; rent <= 850; rent += 5) {
+    const l = evaluate(listing({ rent }));
+    assert.equal(l.rejections.some((r) => r.code === 'budget'), l.netCost > CRITERIA.maxNetRent, String(rent));
+  }
   assert.deepEqual(codes(listing({ isShared: true })), ['colocation']);
-  assert.deepEqual(codes(listing({ type: 'T3+' })), ['type']);
+  assert.deepEqual(codes(listing({ type: 'T3+', surface: 62 })), []);
+  assert.deepEqual(codes(listing({ type: 'maison', surface: 80 })), []);
   assert.deepEqual(codes(listing({ type: 'autre' })), ['type']);
   const far = getDistrict('saint-marc')!;
   assert.deepEqual(codes(listing({ districtId: far.id, lat: far.lat, lng: far.lng })), ['distance']);
@@ -432,8 +442,9 @@ test('Leboncoin : l’URL de recherche porte tous les critères', async () => {
   const url = new URL(LEBONCOIN_SEARCH_URL);
   assert.equal(url.searchParams.get('category'), '10');
   assert.equal(url.searchParams.get('furnished'), '1');
-  assert.equal(url.searchParams.get('price'), 'min-700');
-  assert.equal(url.searchParams.get('rooms'), '2-2');
+  assert.equal(url.searchParams.get('price'), 'min-800');
+  assert.equal(url.searchParams.get('rooms'), null);
+  assert.equal(url.searchParams.get('real_estate_type'), '1,2');
   assert.equal(url.searchParams.get('square'), '25-max');
   assert.equal(url.searchParams.get('locations'), 'Saint-Nazaire_44600');
   for (const portal of APIFY_PORTALS) assert.ok(portal.actors.length >= 1, portal.id);
@@ -471,10 +482,11 @@ test('Apify : libellé de charges SeLoger', async () => {
   assert.equal(toRawListing({ ...base, chargesLabel: '+ 35 € de charges' }, portal)!.priceText, '480 € + 35 € de charges');
 });
 
-test('critères : T2 uniquement, 25 m² minimum', () => {
+test('critères : T2, T3, T4, maisons ; seuls les logements de moins de 25 m² sont exclus', () => {
   const codes = (l: Listing) => evaluate(l).rejections.map((r) => r.code);
-  assert.deepEqual(codes(listing({ type: 'studio', surface: 30 })), ['type']);
-  assert.deepEqual(codes(listing({ type: 'T1', surface: 30 })), ['type']);
+  assert.deepEqual(codes(listing({ type: 'studio', surface: 30 })), []);
+  assert.deepEqual(codes(listing({ type: 'studio', surface: 22 })), ['surface']);
+  assert.deepEqual(codes(listing({ type: 'T1', surface: 30 })), []);
   assert.deepEqual(codes(listing({ surface: 24 })), ['surface']);
   assert.deepEqual(codes(listing({ surface: 25 })), []);
 });
@@ -506,9 +518,74 @@ test('loyer net et score : le loyer après aide est comparé au budget idéal', 
   assert.equal(l.housingAid, 186);
   assert.equal(l.netCost, 640 - 186);
   assert.equal(l.scoreParts.find((p) => p.id === 'prix')!.label, 'Loyer net');
-  assert.equal(priceScore(350), 40);
-  assert.equal(priceScore(550), 32);
-  assert.equal(priceScore(700), 8);
-  assert.ok(priceScore(400) > priceScore(500));
+  assert.equal(priceScore(300), 40);
+  assert.equal(priceScore(500), 32);
+  assert.equal(priceScore(600), 8);
+  assert.ok(priceScore(400) > priceScore(450));
   assert.ok(evaluate(listing({ rent: 560 })).score > evaluate(listing({ rent: 690 })).score);
+  assert.equal(evaluate(listing({ rent: 640 })).budgetTier, 'ideal');
+  assert.equal(evaluate(listing({ rent: 740 })).budgetTier, 'dernier-recours');
+});
+
+test('SeLoger : « meublé » lu dans les caractéristiques, à toute profondeur', async () => {
+  const { toRawListing, findFurnished, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const portal = APIFY_PORTALS.find((p) => p.id === 'seloger')!;
+  const base = {
+    url: 'https://www.seloger.com/annonces/locations/appartement/saint-nazaire-44/250000002.htm',
+    title: 'Appartement à louer',
+    priceAmount: 690,
+    chargesLabel: 'Charges comprises',
+    rooms: 3,
+    surface: 58,
+    city: 'Saint-Nazaire',
+    zipCode: '44600',
+    description: 'Lumineux, proche gare.',
+  };
+  assert.equal(findFurnished({ features: { isFurnished: true } }), true);
+  assert.equal(findFurnished({ rawData: { listing: { furnished: 'false' } } }), false);
+  assert.equal(findFurnished({ tags: ['Balcon', 'Meublé'] }), true);
+  assert.equal(findFurnished({ tags: ['Non meublé'] }), false);
+  assert.equal(findFurnished({ keyFacts: [{ label: 'Meublé', value: true }] }), true);
+  assert.equal(findFurnished({ tags: ['Balcon'] }), null);
+
+  const furnished = normalizeListing(toRawListing({ ...base, tags: ['Meublé', 'Balcon'] }, portal)!, TODAY)!;
+  assert.equal(furnished.furnished, true);
+  assert.equal(furnished.type, 'T3+');
+  assert.ok(evaluate(furnished).accepted, evaluate(furnished).rejections.map((r) => r.code).join());
+  const empty = normalizeListing(toRawListing({ ...base, features: { furnished: false } }, portal)!, TODAY)!;
+  assert.equal(empty.furnished, false);
+});
+
+test('nouvelles sources : PAP, Logic-Immo, ParuVendu, LocService', async () => {
+  const { APIFY_PORTALS, SEARCH_MAX_RENT, PAP_SEARCH_URL, LOGICIMMO_SEARCH_URL } = await import('../scripts/sources/apify');
+  const { AGENCY_SITES } = await import('../scripts/sources/agency-pages');
+  for (const id of ['pap', 'logicimmo', 'paruvendu']) assert.ok(APIFY_PORTALS.some((p) => p.id === id), id);
+  assert.equal(SEARCH_MAX_RENT, 800);
+  assert.match(PAP_SEARCH_URL, /^https:\/\/www\.pap\.fr\/annonce\/locations-saint-nazaire-44600-g\d+$/);
+  assert.equal(new URL(LOGICIMMO_SEARCH_URL).searchParams.get('distributionTypes'), 'Rent');
+  const locservice = AGENCY_SITES.find((s) => s.id === 'locservice')!;
+  assert.ok(locservice.detailPattern.test('/loire-atlantique-44/location-appartement-st-nazaire/336910'));
+  assert.ok(locservice.detailPattern.test('/loire-atlantique-44/location-appartement-st-nazaire/p-cf-114077073716'));
+  assert.ok(!locservice.detailPattern.test('/loire-atlantique-44/location-maison-donges/2603956'));
+  assert.ok(!locservice.detailPattern.test('/loire-atlantique-44/location-st-nazaire-p2.html'));
+  assert.ok(locservice.skipCard!.test('Appartement T3 à louer\nLoué\nSaint-Nazaire (44600)'));
+  assert.ok(!locservice.skipCard!.test('Appartement T2 meublé à louer\nSaint-Nazaire (44600)\n36 m²'));
+
+  const { toRawListing } = await import('../scripts/sources/apify');
+  const pap = APIFY_PORTALS.find((p) => p.id === 'pap')!;
+  const raw = toRawListing(
+    {
+      url: 'https://www.pap.fr/annonces/appartement-saint-nazaire-44600-r464202241',
+      title: 'Location meublée appartement 3 pièces 46 m²',
+      price: 760,
+      surface: 46,
+      rooms: 3,
+      postal_code: '44600',
+      city: 'Saint-Nazaire',
+    },
+    pap,
+  )!;
+  const l = normalizeListing(raw, TODAY)!;
+  assert.equal(l.furnished, true);
+  assert.equal(l.postcode, '44600');
 });

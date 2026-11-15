@@ -4,8 +4,8 @@ import { euro } from '@/lib/format';
 import type { BudgetTier } from '@/lib/types';
 
 /** Bornes de l'échelle, en euros. */
-const SCALE_MIN = 350;
-const SCALE_MAX = 770;
+const SCALE_MIN = 250;
+const SCALE_MAX = 700;
 
 const position = (value: number) =>
   Math.max(0, Math.min(100, ((value - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100));
@@ -20,11 +20,11 @@ const MARKER_TONE: Record<BudgetTier, string> = {
 /**
  * Jauge de loyer, lue comme une ligne de charge sur une coque :
  * vert jusqu'au loyer idéal, ambre jusqu'au plafond, hachures rouges au-delà.
- * Le repère vertical situe le loyer charges comprises de l'annonce.
+ * Le repère vertical situe le loyer net de l'annonce, après aide au logement estimée.
  */
 export function LoadLine({ cost, showScale = false }: { cost?: number; showScale?: boolean }) {
-  const ideal = position(CRITERIA.idealRent);
-  const max = position(CRITERIA.maxRent);
+  const ideal = position(CRITERIA.idealNetRent);
+  const max = position(CRITERIA.maxNetRent);
   const tier = cost != null ? budgetTier(cost) : null;
 
   return (
@@ -32,8 +32,8 @@ export function LoadLine({ cost, showScale = false }: { cost?: number; showScale
       role="img"
       aria-label={
         cost != null && tier
-          ? `Loyer de ${euro(cost)} charges comprises : ${BUDGET_TIER_LABELS[tier].toLowerCase()}`
-          : `Échelle de loyer : idéal jusqu'à ${euro(CRITERIA.idealRent)}, maximum ${euro(CRITERIA.maxRent)}`
+          ? `Loyer net de ${euro(cost)} après aide estimée : ${BUDGET_TIER_LABELS[tier].toLowerCase()}`
+          : `Échelle de loyer net : idéal jusqu'à ${euro(CRITERIA.idealNetRent)}, maximum ${euro(CRITERIA.maxNetRent)}`
       }
       className="select-none"
     >
@@ -54,10 +54,10 @@ export function LoadLine({ cost, showScale = false }: { cost?: number; showScale
       {showScale ? (
         <div className="relative mt-1.5 h-4 text-xs tabular-nums text-muted" aria-hidden>
           <span className="absolute -translate-x-1/2" style={{ left: `${ideal}%` }}>
-            {CRITERIA.idealRent}
+            {CRITERIA.idealNetRent}
           </span>
           <span className="absolute -translate-x-1/2" style={{ left: `${max}%` }}>
-            {CRITERIA.maxRent}
+            {CRITERIA.maxNetRent}
           </span>
         </div>
       ) : null}
