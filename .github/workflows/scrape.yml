@@ -11,6 +11,10 @@ on:
         description: Détailler chaque page lue dans le journal
         type: boolean
         default: false
+      recover:
+        description: Reprendre les annonces de toutes les collectes passées (historique git)
+        type: boolean
+        default: false
 
 concurrency:
   group: collecte
@@ -26,6 +30,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Historique complet : permet de reprendre les annonces des collectes passées.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -37,7 +44,7 @@ jobs:
       - name: Collecter les annonces
         run: npm run collect
         env:
-          # Grands portails (Leboncoin, SeLoger, Bien'ici) via Apify : les deux secrets sont nécessaires.
+          # Grands portails (Leboncoin, SeLoger, Bien'ici, PAP, Logic-Immo, ParuVendu) via Apify : les deux secrets sont nécessaires.
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           # Phrase secrète : les annonces sont publiées chiffrées et les journaux restent muets.
           LISTINGS_PASSPHRASE: ${{ secrets.LISTINGS_PASSPHRASE }}
@@ -49,6 +56,7 @@ jobs:
           # Facultatif : flux JSON d'annonces, adresses séparées par des virgules.
           FEED_URLS: ${{ vars.FEED_URLS }}
           COLLECT_DEBUG: ${{ inputs.debug && '1' || '' }}
+          RECOVER_HISTORY: ${{ inputs.recover && '1' || '' }}
 
       - name: Enregistrer les annonces dans le dépôt
         run: |

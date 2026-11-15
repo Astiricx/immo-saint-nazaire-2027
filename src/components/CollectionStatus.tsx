@@ -1,5 +1,6 @@
 'use client';
 
+import { RETENTION_DAYS } from '@/lib/history';
 import { ChevronDown } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
 import type { ListingsFile, RejectionCode, SourceStatus } from '@/lib/types';
@@ -96,6 +97,14 @@ export function CollectionStatus({ data }: { data: ListingsFile }) {
           {data.stats.duplicates} doublon{data.stats.duplicates > 1 ? 's' : ''} retiré{data.stats.duplicates > 1 ? 's' : ''},{' '}
           {rejectedTotal} écartée{rejectedTotal > 1 ? 's' : ''} par les critères. Seules les annonces
           conformes sont publiées ici.
+          {data.stats.fresh != null ? (
+            <>
+              {' '}Les annonces s’accumulent d’une collecte à l’autre : {data.stats.fresh} revue
+              {data.stats.fresh > 1 ? 's' : ''} lors de cette collecte, {data.stats.carried ?? 0}{' '}
+              conservée{(data.stats.carried ?? 0) > 1 ? 's' : ''} des précédentes (vues dans les{' '}
+              {RETENTION_DAYS} derniers jours).
+            </>
+          ) : null}
         </p>
       </div>
     </details>

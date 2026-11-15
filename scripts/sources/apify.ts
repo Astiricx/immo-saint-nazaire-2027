@@ -629,7 +629,8 @@ function furnishedPaths(items: Item[]): string {
 /** Lance un Actor, attend la fin de l'exécution et renvoie tout son jeu de données. */
 export async function runActor(actor: ApifyActor, input: Record<string, unknown>): Promise<Item[]> {
   const id = actor.actorId.replace('/', '~');
-  const start = await apify(`/acts/${id}/runs?maxTotalChargeUsd=${MAX_RUN_COST_USD}`, {
+  // maxTotalChargeUsd : plafond des Actors payés au résultat ; timeout : arrêt côté Apify au bout de 20 min.
+  const start = await apify(`/acts/${id}/runs?maxTotalChargeUsd=${MAX_RUN_COST_USD}&timeout=1200`, {
     method: 'POST',
     body: JSON.stringify(input),
   });
@@ -638,7 +639,12 @@ export async function runActor(actor: ApifyActor, input: Record<string, unknown>
     if (/actor-disabled|monthly usage|usage limit/i.test(detail)) throw new CreditExhaustedError(await creditRenewal());
     throw new Error(`${httpHint(start.status, actor.actorId)} — ${detail}`);
   }
-  let run = ((await start.json()) as { data: { id: string; status: string; defaultDatasetId: string; statusMessage?: string } }).data;
+  let run = (
+    (await start.json()) as {
+      data: { id: string; status: string; defaultDatasetId: string; statusMessage?: string; usageTotalUsd?: number };
+    }
+  ).data;
+  let stoppedForCost = false;
 
   const deadline = Date.now() + RUN_TIMEOUT_MS;
   while (!['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT'].includes(run.status)) {
@@ -647,10 +653,19 @@ export async function runActor(actor: ApifyActor, input: Record<string, unknown>
       throw new Error(`exécution de ${actor.actorId} interrompue après 25 minutes`);
     }
     // Attente longue côté Apify : la réponse arrive dès que l'exécution se termine.
-    const poll = await apify(`/actor-runs/${run.id}?waitForFinish=60`);
+    const poll = await apify(`/actor-runs/${run.id}?waitForFinish=30`);
     if (poll.ok) run = ((await poll.json()) as { data: typeof run }).data;
     else await sleep(10000);
+    // Actors payés à l'usage (calcul + proxys) : maxTotalChargeUsd ne les borne pas, on surveille.
+    if (!stoppedForCost && (run.usageTotalUsd ?? 0) >= MAX_RUN_COST_USD && run.status === 'RUNNING') {
+      stoppedForCost = true;
+      console.log(`  ${actor.actorId} : arrêt à ${MAX_RUN_COST_USD} $ de consommation (plafond par exécution)`);
+      await apify(`/actor-runs/${run.id}/abort?gracefully=true`, { method: 'POST' }).catch(() => undefined);
+    }
   }
+  console.log(
+    `  ${actor.actorId} : exécution ${run.status.toLowerCase()}, consommation plateforme ${(run.usageTotalUsd ?? 0).toFixed(3)} $`,
+  );
   if (run.status !== 'SUCCEEDED') {
     // Une exécution échouée a parfois déjà enregistré des annonces : on les garde.
     console.log(`  ${actor.actorId} : exécution ${run.status}${run.statusMessage ? ` (${run.statusMessage.slice(0, 160)})` : ''}`);

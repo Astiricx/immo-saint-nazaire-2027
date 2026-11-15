@@ -13,6 +13,7 @@ import {
 } from '@/lib/format';
 import type { TrackEntry } from '@/lib/storage';
 import type { EvaluatedListing } from '@/lib/types';
+import { RETENTION_DAYS } from '@/lib/history';
 import { LoadLine } from './LoadLine';
 import { ListingLink, NetRent, ScoreBadge, StatusSelect, TierTag, useOverlay } from './ui';
 import { aidProfileLabel, APL_SCALE, estimateApl } from '@/lib/apl';
@@ -229,7 +230,14 @@ export function ListingDrawer({
             <p className="mt-4 text-sm text-muted">
               {l.sourceLabel}
               {l.publishedAt ? `, publiée le ${formatDate(l.publishedAt)}` : ''}, repérée par la
-              collecte le {formatDate(l.firstSeen)}.
+              collecte le {formatDate(l.firstSeen)}
+              {l.lastSeen && l.lastSeen !== l.firstSeen ? `, revue pour la dernière fois le ${formatDate(l.lastSeen)}` : ''}.
+              {l.stillListed === false ? (
+                <span className="mt-1 block text-warn">
+                  Absente de la dernière collecte : l’annonce a peut-être été retirée ou le bien loué.
+                  Elle reste affichée {RETENTION_DAYS} jours après sa dernière apparition.
+                </span>
+              ) : null}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-muted">
               Les informations viennent de l’annonce d’origine : vérifiez-les avant de vous

@@ -589,3 +589,38 @@ test('nouvelles sources : PAP, Logic-Immo, ParuVendu, LocService', async () => {
   assert.equal(l.furnished, true);
   assert.equal(l.postcode, '44600');
 });
+
+test('historique : les annonces s’accumulent d’une collecte à l’autre, sans doublon', async () => {
+  const { mergeWithHistory, canonicalUrl } = await import('../src/lib/history');
+  const a = listing({ id: 'pap-a', url: 'https://www.pap.fr/annonces/a-r1', firstSeen: '2026-11-10', rent: 600 });
+  const b = listing({ id: 'lbc-b', url: 'https://www.leboncoin.fr/ad/locations/2', firstSeen: '2026-11-12', rent: 610 });
+  const old = listing({ id: 'sh-c', url: 'https://www.squarehabitat.fr/x/c', firstSeen: '2026-09-01', rent: 620 });
+  const history = [
+    { listing: a, collectedOn: '2026-11-14' },
+    { listing: b, collectedOn: '2026-11-14' },
+    { listing: old, collectedOn: '2026-10-01' },
+  ];
+  // Aujourd'hui, seule « a » est revue (avec un lien de suivi), et une nouvelle « d » apparaît.
+  const aAgain = { ...a, url: 'https://pap.fr/annonces/a-r1/?utm_source=alerte#photos', firstSeen: TODAY };
+  const d = listing({ id: 'pap-d', url: 'https://www.pap.fr/annonces/d-r4', rent: 630, firstSeen: TODAY });
+  const result = mergeWithHistory([aAgain, d], history, '2026-11-15');
+  const byId = new Map(result.listings.map((l) => [l.id, l]));
+  assert.equal(result.listings.length, 3);
+  assert.equal(byId.get('pap-a')!.firstSeen, '2026-11-10');
+  assert.equal(byId.get('pap-a')!.stillListed, true);
+  assert.equal(byId.get('lbc-b')!.stillListed, false);
+  assert.equal(byId.get('lbc-b')!.lastSeen, '2026-11-14');
+  assert.ok(byId.has('pap-d'));
+  assert.ok(!byId.has('sh-c'), 'plus revue depuis plus de 30 jours');
+  assert.equal(result.fresh, 2);
+  assert.equal(result.carried, 1);
+  assert.equal(result.expired, 1);
+  assert.equal(canonicalUrl('https://WWW.Pap.fr/annonces/a-r1/?utm_medium=x&b=2&a=1#x'), 'https://pap.fr/annonces/a-r1?a=1&b=2');
+
+  // Une annonce de l'historique devenue hors critères est retirée.
+  const tooExpensive = listing({ id: 'x', url: 'https://example.org/x', rent: 900 });
+  assert.equal(mergeWithHistory([], [{ listing: tooExpensive, collectedOn: '2026-11-14' }], '2026-11-15').listings.length, 0);
+  // Collecte suivante : rien ne disparaît.
+  const next = mergeWithHistory([], result.listings.map((l) => ({ listing: l, collectedOn: '2026-11-15' })), '2026-11-16');
+  assert.equal(next.listings.length, 3);
+});

@@ -93,6 +93,11 @@ export function ListingCard({
       </div>
       <p className="border-t border-line px-4 py-2 text-xs text-muted">
         {l.sourceLabel}, repérée le {formatDate(l.publishedAt ?? l.firstSeen, false)}
+        {l.stillListed === false && l.lastSeen ? (
+          <span className="block text-warn">
+            Plus revue depuis le {formatDate(l.lastSeen, false)} : peut-être déjà louée
+          </span>
+        ) : null}
       </p>
     </article>
   );

@@ -78,6 +78,13 @@ export interface Listing {
   publishedAt: string | null;
   /** Première collecte où l'annonce est apparue. */
   firstSeen: string;
+  /** Dernière collecte où l'annonce figurait encore sur sa source. */
+  lastSeen?: string;
+  /**
+   * false : l'annonce n'a pas été revue lors de la dernière collecte (retirée, louée, ou source en panne).
+   * Elle reste affichée pendant la durée de l'historique glissant.
+   */
+  stillListed?: boolean;
   features: string[];
 }
 
@@ -139,7 +146,13 @@ export interface ListingsFile {
     duplicates: number;
     unreadable: number;
     rejected: Partial<Record<RejectionCode, number>>;
+    /** Annonces retenues revues lors de cette collecte. */
+    fresh?: number;
+    /** Annonces retenues lors des collectes précédentes, conservées dans l'historique. */
+    carried?: number;
+    /** Annonces retirées de l'historique : plus revues depuis trop longtemps, ou hors critères. */
+    expired?: number;
   };
-  /** Uniquement les annonces qui respectent les critères. */
+  /** Uniquement les annonces qui respectent les critères, cumulées sur l'historique glissant. */
   listings: Listing[];
 }

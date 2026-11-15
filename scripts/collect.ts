@@ -5,17 +5,21 @@
  *   npm run collect -- --debug détaille chaque page lue (pour régler une source)
  *
  * Étapes : sources → normalisation → géocodage des adresses → dédoublonnage
- * → filtrage strict (src/lib/evaluate.ts) → publication.
+ * → filtrage strict (src/lib/evaluate.ts) → fusion avec l'historique (src/lib/history.ts) → publication.
+ * Les annonces des collectes précédentes ne sont jamais écrasées : elles restent publiées
+ * tant qu'elles ont été revues dans les RETENTION_DAYS derniers jours.
  * Seules les annonces conformes aux critères sont publiées :
  *   - avec le secret LISTINGS_PASSPHRASE : public/listings.enc.json, chiffré (portails inclus) ;
  *   - sans : public/listings.json, en clair, sans les portails (Leboncoin, SeLoger, Bien'ici, PAP…).
  */
+import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { CRITERIA } from '../src/lib/criteria';
 import { decryptJson, encryptJson, isEncryptedFile } from '../src/lib/crypto';
 import { evaluate } from '../src/lib/evaluate';
 import { euro } from '../src/lib/format';
+import { RETENTION_DAYS, mergeWithHistory, type HistoryEntry } from '../src/lib/history';
 import { dedupe, normalizeListing, withCoordinates } from '../src/lib/normalize';
 import type {
   Listing,
@@ -54,23 +58,71 @@ const REASON_LABELS: Record<RejectionCode, string> = {
   ville: 'hors Saint-Nazaire',
 };
 
-async function readPrevious(): Promise<ListingsFile | null> {
+/** Lit un fichier d'annonces, chiffré ou non. null s'il est illisible (phrase secrète changée…). */
+async function parseListingsFile(text: string): Promise<ListingsFile | null> {
   try {
-    if (PRIVATE_MODE && existsSync(ENCRYPTED_OUTPUT)) {
-      const payload: unknown = JSON.parse(readFileSync(ENCRYPTED_OUTPUT, 'utf8'));
-      return isEncryptedFile(payload) ? await decryptJson<ListingsFile>(payload, PASSPHRASE) : null;
+    const payload: unknown = JSON.parse(text);
+    if (isEncryptedFile(payload)) {
+      return PRIVATE_MODE ? await decryptJson<ListingsFile>(payload, PASSPHRASE) : null;
     }
-    if (existsSync(PLAIN_OUTPUT)) return JSON.parse(readFileSync(PLAIN_OUTPUT, 'utf8')) as ListingsFile;
+    const file = payload as ListingsFile;
+    return Array.isArray(file?.listings) ? file : null;
   } catch {
-    // Fichier illisible ou phrase secrète changée : on repart de zéro.
+    return null;
   }
-  return null;
+}
+
+const toEntries = (file: ListingsFile | null, fallbackDate: string): HistoryEntry[] =>
+  (file?.listings ?? []).map((listing) => ({
+    listing,
+    collectedOn: file?.generatedAt?.slice(0, 10) ?? fallbackDate,
+  }));
+
+/** Annonces de la dernière collecte publiée. */
+async function readPrevious(today: string): Promise<{ file: ListingsFile | null; entries: HistoryEntry[] }> {
+  for (const path of [ENCRYPTED_OUTPUT, PLAIN_OUTPUT]) {
+    if (!existsSync(path)) continue;
+    const file = await parseListingsFile(readFileSync(path, 'utf8'));
+    if (file) return { file, entries: toEntries(file, today) };
+  }
+  return { file: null, entries: [] };
+}
+
+/**
+ * Reprise de l'historique : relit toutes les versions publiées du fichier dans l'historique git
+ * (variable RECOVER_HISTORY=1). Sert à retrouver les annonces des collectes passées.
+ */
+function readGitHistory(today: string): Promise<HistoryEntry[]> {
+  const run = (args: string[]) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const entries: Promise<HistoryEntry[]>[] = [];
+  let commits: string[] = [];
+  try {
+    commits = run(['log', '--format=%H', '--max-count=200', '--', 'public/listings.enc.json', 'public/listings.json'])
+      .split('\n')
+      .filter(Boolean);
+  } catch (error) {
+    console.log(`  historique git illisible : ${(error as Error).message.split('\n')[0]}`);
+  }
+  for (const sha of commits) {
+    for (const path of ['public/listings.enc.json', 'public/listings.json']) {
+      let text: string;
+      try {
+        text = run(['show', `${sha}:${path}`]);
+      } catch {
+        continue;
+      }
+      entries.push(parseListingsFile(text).then((file) => toEntries(file, today)));
+    }
+  }
+  console.log(`Reprise de l'historique : ${commits.length} version(s) publiée(s) relue(s).`);
+  return Promise.all(entries).then((lists) => lists.flat());
 }
 
 async function main() {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const previous = await readPrevious();
+  const { file: previous, entries: previousEntries } = await readPrevious(today);
+  const history = process.env.RECOVER_HISTORY === '1' ? [...(await readGitHistory(today)), ...previousEntries] : previousEntries;
   console.log(
     PRIVATE_MODE
       ? 'Mode privé : annonces publiées chiffrées, aucun contenu dans ce journal.'
@@ -174,20 +226,13 @@ async function main() {
   });
   console.log(`\nPar source (une annonce peut cumuler plusieurs motifs) :\n${breakdown.map((l) => `  ${l}`).join('\n')}`);
 
-  // On garde la date de première apparition, et les annonces d'une source en panne ce jour-là.
-  const previousById = new Map((previous?.listings ?? []).map((l) => [l.id, l]));
-  const failedSources = new Set(reports.filter((r) => r.status !== 'ok' && r.status !== 'inactive').map((r) => r.id));
+  // Fusion avec l'historique : rien n'est écrasé. Les annonces déjà connues gardent leur date de
+  // première apparition ; celles qui ne sont pas revues aujourd'hui restent publiées (marquées
+  // « plus revues ») tant qu'elles ont été vues dans les RETENTION_DAYS derniers jours.
   const byId = new Map(unique.map((l) => [l.id, l]));
-  const keptListings: Listing[] = accepted.map(({ id }) => ({
-    ...(byId.get(id) as Listing),
-    firstSeen: previousById.get(id)?.firstSeen ?? today,
-  }));
-  const keptIds = new Set(keptListings.map((l) => l.id));
-  for (const old of previous?.listings ?? []) {
-    if (failedSources.has(old.collector ?? old.source) && !keptIds.has(old.id) && evaluate(old).accepted) {
-      keptListings.push(old);
-    }
-  }
+  const freshAccepted: Listing[] = accepted.map(({ id }) => byId.get(id) as Listing);
+  const merge = mergeWithHistory(freshAccepted, history, today);
+  const keptListings = merge.listings;
   for (const report of reports) {
     report.kept = keptListings.filter((l) => (l.collector ?? l.source) === report.id).length;
   }
@@ -202,6 +247,9 @@ async function main() {
       duplicates: removed,
       unreadable,
       rejected: rejectedCounts,
+      fresh: merge.fresh,
+      carried: merge.carried,
+      expired: merge.expired,
     },
     listings: keptListings,
   };
@@ -222,7 +270,10 @@ async function main() {
   const lines = [
     `Critères : meublé, ${CRITERIA.minSurface} m² minimum (T2, T3, T4, maison), sans colocation, ${euro(CRITERIA.maxNetRent)} net maximum après aide au logement estimée, ${CRITERIA.maxBikeMinutes} min à vélo des Chantiers.`,
     `${collected.length} annonce(s) collectée(s), ${removed} doublon(s), ${unreadable} illisible(s).`,
-    `${keptListings.length} retenue(s), ${rejectedTotal} écartée(s)${
+    `Historique : ${previous?.listings.length ?? 0} annonce(s) dans le fichier précédent${
+      history.length > previousEntries.length ? `, ${history.length} entrée(s) relue(s) dans l'historique git` : ''
+    } ; publiées : ${keptListings.length} = ${merge.fresh} revue(s) aujourd'hui + ${merge.carried} conservée(s) des collectes précédentes (${RETENTION_DAYS} jours glissants) ; ${merge.expired} retirée(s) ; ${merge.duplicates} doublon(s) fusionné(s).`,
+    `${accepted.length} retenue(s) aujourd'hui, ${rejectedTotal} écartée(s)${
       rejectedTotal
         ? ` : ${Object.entries(rejectedCounts)
             .map(([code, n]) => `${n} ${REASON_LABELS[code as RejectionCode]}`)

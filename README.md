@@ -19,7 +19,7 @@ Site : <https://astiricx.github.io/immo-saint-nazaire-2027/>
 | Trajet | 30 minutes à vélo au maximum jusqu'aux Chantiers, quand l'annonce permet de situer le logement : jusqu'un peu après le Rocher du Lion par le front de mer. |
 | Disponibilité | Janvier 2027 ou fin 2026 : compte dans le score, n'écarte pas l'annonce. |
 
-Seules les annonces conformes sont publiées. Une annonce qui ne précise ni rue ni quartier est conservée avec la mention « trajet à vérifier » plutôt que d'être écartée à tort.
+Seules les annonces conformes sont publiées, **cumulées d'une collecte à l'autre** : chaque passage relit le fichier chiffré précédent, ajoute les nouvelles annonces, fusionne les doublons (même lien, paramètres de suivi ignorés, ou même bien sur deux sources) et garde la date de première apparition. Une annonce absente d'une collecte reste affichée, marquée « plus revue », pendant 30 jours après sa dernière apparition (`RETENTION_DAYS` dans [`src/lib/history.ts`](src/lib/history.ts)), sauf si elle ne respecte plus les critères. Pour reprendre les annonces de toutes les collectes passées, lancez la collecte à la main avec l'option « Reprendre les annonces de toutes les collectes passées ». Une annonce qui ne précise ni rue ni quartier est conservée avec la mention « trajet à vérifier » plutôt que d'être écartée à tort.
 
 Les seuils se règlent dans [`src/lib/criteria.ts`](src/lib/criteria.ts).
 
@@ -43,7 +43,7 @@ Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion
 
 Aucune limite de volume : chaque portail renvoie toutes les annonces de la recherche (Saint-Nazaire, maisons et appartements, 25 m² minimum, meublé quand le portail le permet, loyer affiché jusqu'à 800 €, soit le plafond net plus l'aide maximale). Les Actors sont payés au résultat, de un à quelques dollars pour mille annonces, plus le trafic des proxys résidentiels. Votre consommation est visible dans la console Apify.
 
-**Crédit.** L'offre gratuite d'Apify inclut 5 $ d'usage par mois. Chaque exécution d'Actor est plafonnée à 0,75 $ ([`apify.ts`](scripts/sources/apify.ts), `MAX_RUN_COST_USD`) pour qu'une recherche mal comprise ne vide pas le crédit. Quand le crédit est épuisé, la collecte le signale avec sa date de renouvellement, conserve les annonces déjà retenues et continue avec les autres sources.
+**Crédit.** L'offre gratuite d'Apify inclut 5 $ d'usage par mois. Chaque exécution d'Actor est plafonnée à 0,75 $ ([`apify.ts`](scripts/sources/apify.ts), `MAX_RUN_COST_USD`) : plafond imposé par Apify pour les Actors payés au résultat, arrêt par la collecte pour ceux payés à l'usage, et 20 minutes au plus. Le journal indique la consommation de chaque exécution. Quand le crédit est épuisé, la collecte le signale avec sa date de renouvellement, conserve les annonces déjà retenues et continue avec les autres sources.
 
 Chaque portail a plusieurs Actors candidats, listés dans [`scripts/sources/apify.ts`](scripts/sources/apify.ts) et essayés dans l'ordre : le premier qui renvoie des annonces exploitables est retenu, et le bilan de la collecte indique lequel. Ces Actors sont publiés par des tiers et peuvent disparaître : ajoutez-en un à la liste (`actorId` et `input`) si besoin. La conversion des résultats accepte les noms de champs courants.
 
