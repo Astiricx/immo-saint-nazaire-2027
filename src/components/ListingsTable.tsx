@@ -34,7 +34,7 @@ function SortHeader({
       <button
         type="button"
         onClick={() => onSort(next)}
-        className={`inline-flex items-center gap-1 hover:text-ink ${active ? 'text-ink' : ''}`}
+        className={`inline-flex items-center gap-1 whitespace-nowrap hover:text-ink ${active ? 'text-ink' : ''}`}
       >
         {label}
         {active ? (
@@ -67,7 +67,7 @@ export function ListingsTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-md border border-line bg-surface">
-      <table className="w-full min-w-[980px] border-collapse text-sm">
+      <table className="w-full min-w-[1080px] border-collapse text-sm">
         <thead className="border-b border-line text-muted">
           <tr>
             <th scope="col" className="px-3 py-2 text-left font-medium">
@@ -83,6 +83,7 @@ export function ListingsTable({
               sort={sort}
               onSort={onSort}
             />
+            <SortHeader label="Net après APL" sortKeys={['net-asc']} sort={sort} onSort={onSort} align="right" />
             <SortHeader label="Vélo" sortKeys={['bike']} sort={sort} onSort={onSort} align="right" />
             <th scope="col" className="px-3 py-2 text-left font-medium">
               Disponibilité
@@ -126,6 +127,12 @@ export function ListingsTable({
                   </div>
                   {l.costIsEstimated ? <span className="text-xs text-muted">estimé</span> : null}
                 </div>
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                <span className="font-display text-xl font-semibold leading-none tabular-nums text-accent">
+                  {euro(l.netCost)}
+                </span>
+                <span className="block text-xs text-muted">aide {euro(l.housingAid)}</span>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
                 {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'À vérifier'}

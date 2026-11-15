@@ -258,13 +258,14 @@ test('score : moins cher, plus proche et mieux daté passe devant', () => {
 test('dédoublonnage et tris', () => {
   const a = listing({ id: 'a', url: 'https://a.fr/1' });
   const b = listing({ id: 'b', url: 'https://b.fr/9' });
-  const c = listing({ id: 'c', url: 'https://c.fr/3', rent: 480, surface: 22, type: 'studio' });
+  const c = listing({ id: 'c', url: 'https://c.fr/3', rent: 480, surface: 30 });
   const { unique, removed } = dedupe([a, b, c]);
   assert.equal(removed, 1);
   const evaluated = unique.map((l) => evaluate(l));
   assert.deepEqual(sortListings(evaluated, 'price-asc').map((l) => l.id), ['c', 'a']);
-  const studios = applyFilters(evaluated, { ...DEFAULT_FILTERS, type: 'studio' }, () => 'a-analyser');
-  assert.deepEqual(studios.map((l) => l.id), ['c']);
+  assert.deepEqual(sortListings(evaluated, 'net-asc').map((l) => l.id), ['c', 'a']);
+  const big = applyFilters(evaluated, { ...DEFAULT_FILTERS, minSurface: 35 }, () => 'a-analyser');
+  assert.deepEqual(big.map((l) => l.id), ['a']);
 });
 
 test('alerte e-mail : les paramètres de suivi sont retirés des liens publiés', async () => {
@@ -394,6 +395,9 @@ test('Apify : résultat Bien’ici converti, lien étranger refusé', async () =
 test('meublé : détection stricte et rejet de tout ce qui n’est pas clairement meublé', async () => {
   const { detectFurnished } = await import('../src/lib/normalize');
   assert.equal(detectFurnished('Studio meublé proche gare'), true);
+  assert.equal(detectFurnished('Location appartement 2 pièces meublé - 30.6m²'), true);
+  assert.equal(detectFurnished('Appartement T2 MEUBLÉ, 3e étage'), true);
+  assert.equal(detectFurnished('Joli 2 pièces meublée.'), true);
   assert.equal(detectFurnished('T2 entierement meuble et equipe'), true);
   assert.equal(detectFurnished('Location meublée, bail 1 an'), true);
   assert.equal(detectFurnished('Appartement non meublé'), false);
@@ -429,6 +433,8 @@ test('Leboncoin : l’URL de recherche porte tous les critères', async () => {
   assert.equal(url.searchParams.get('category'), '10');
   assert.equal(url.searchParams.get('furnished'), '1');
   assert.equal(url.searchParams.get('price'), 'min-700');
+  assert.equal(url.searchParams.get('rooms'), '2-2');
+  assert.equal(url.searchParams.get('square'), '25-max');
   assert.equal(url.searchParams.get('locations'), 'Saint-Nazaire_44600');
   for (const portal of APIFY_PORTALS) assert.ok(portal.actors.length >= 1, portal.id);
 });
@@ -463,4 +469,46 @@ test('Apify : libellé de charges SeLoger', async () => {
   const base = { url: 'https://www.seloger.com/annonces/x.htm', title: 'Studio', priceAmount: 480, surface: 22, city: 'Saint-Nazaire', zipCode: '44600' };
   assert.equal(toRawListing({ ...base, chargesLabel: 'Charges comprises' }, portal)!.priceText, '480 € CC');
   assert.equal(toRawListing({ ...base, chargesLabel: '+ 35 € de charges' }, portal)!.priceText, '480 € + 35 € de charges');
+});
+
+test('critères : T2 uniquement, 25 m² minimum', () => {
+  const codes = (l: Listing) => evaluate(l).rejections.map((r) => r.code);
+  assert.deepEqual(codes(listing({ type: 'studio', surface: 30 })), ['type']);
+  assert.deepEqual(codes(listing({ type: 'T1', surface: 30 })), ['type']);
+  assert.deepEqual(codes(listing({ surface: 24 })), ['surface']);
+  assert.deepEqual(codes(listing({ surface: 25 })), []);
+});
+
+test('aide au logement : barème au 1er octobre 2026', async () => {
+  const { estimateApl, rentRatioRate, APL_SCALE } = await import('../src/lib/apl');
+  const zone = (z: 1 | 2 | 3, scholarship = false) => ({ ...CRITERIA, housingAid: { ...CRITERIA.housingAid, zone: z, scholarship } });
+  // Étudiant non boursier, forfait de ressources 8 600 € même avec 0 € de revenus.
+  const z3 = estimateApl(550, zone(3));
+  assert.equal(z3.income, 8600);
+  assert.equal(z3.rentRetained, 275.25, 'loyer plafonné');
+  assert.equal(z3.amount, 186);
+  assert.equal(estimateApl(550, zone(2)).amount, 203);
+  assert.ok(estimateApl(550, zone(3, true)).amount > z3.amount, 'boursier : aide plus élevée');
+  // Au-dessus du plafond, le loyer réel ne change plus l'aide ; dégressivité au-delà de 2,5 × le plafond.
+  assert.equal(estimateApl(400, zone(3)).amount, z3.amount);
+  assert.ok(estimateApl(690, zone(3)).amount < z3.amount);
+  assert.equal(estimateApl(900, zone(3)).amount, 0);
+  assert.equal(rentRatioRate(APL_SCALE.referenceRent), 0.00305);
+  // Contrôle sur un exemple publié (barème d'octobre 2025, étudiant boursier, zone 2, 400 € : environ 249 €).
+  const oct2025 = { ...APL_SCALE, rentCeiling: { 1: 333.14, 2: 290.34, 3: 272.12 }, referenceRent: 290.34, chargesAllowance: 60.59, minimumParticipation: 39.56 };
+  const published = estimateApl(400, zone(2, true), oct2025).amount;
+  assert.ok(Math.abs(published - 249) <= 5, `${published} €`);
+});
+
+test('loyer net et score : le loyer après aide est comparé au budget idéal', async () => {
+  const { priceScore } = await import('../src/lib/evaluate');
+  const l = evaluate(listing({ rent: 640, chargesIncluded: true }));
+  assert.equal(l.housingAid, 186);
+  assert.equal(l.netCost, 640 - 186);
+  assert.equal(l.scoreParts.find((p) => p.id === 'prix')!.label, 'Loyer net');
+  assert.equal(priceScore(350), 40);
+  assert.equal(priceScore(550), 32);
+  assert.equal(priceScore(700), 8);
+  assert.ok(priceScore(400) > priceScore(500));
+  assert.ok(evaluate(listing({ rent: 560 })).score > evaluate(listing({ rent: 690 })).score);
 });

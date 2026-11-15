@@ -1,3 +1,4 @@
+import { estimateApl } from './apl';
 import { CRITERIA, type Criteria } from './criteria';
 import { euro, formatAvailability, formatSurface, typeLabel } from './format';
 import { bikeTrip, getDistrict, isTargetCity } from './geo';
@@ -47,11 +48,26 @@ const ZONE_LABELS: Record<Zone, string> = {
   inconnu: 'Secteur non précisé dans l’annonce',
 };
 
-function priceScore(cost: number, criteria: Criteria): number {
-  if (cost <= criteria.idealRent) return 40;
-  if (cost >= criteria.maxRent) return 8;
-  const ratio = (cost - criteria.idealRent) / (criteria.maxRent - criteria.idealRent);
-  return 40 - ratio * 32;
+/**
+ * Note du loyer, sur le loyer net (après aide au logement estimée) :
+ * 40 points jusqu'à 200 € sous le budget idéal, 32 au budget idéal, puis dégressif jusqu'à 8 au plafond.
+ * Sous le budget idéal, chaque euro économisé compte encore un peu.
+ */
+export function priceScore(netCost: number, criteria: Criteria = CRITERIA): number {
+  const floor = criteria.idealRent - 200;
+  if (netCost <= floor) return 40;
+  if (netCost <= criteria.idealRent) return 40 - ((netCost - floor) / 200) * 8;
+  if (netCost >= criteria.maxRent) return 8;
+  return 32 - ((netCost - criteria.idealRent) / (criteria.maxRent - criteria.idealRent)) * 24;
+}
+
+/** Loyer hors charges : base du calcul de l'aide au logement. */
+export function rentExcludingCharges(
+  listing: Pick<Listing, 'rent' | 'chargesIncluded' | 'charges' | 'type'>,
+  criteria: Criteria = CRITERIA,
+): number {
+  if (!listing.chargesIncluded) return listing.rent;
+  return listing.rent - (listing.charges ?? criteria.chargesEstimate[listing.type]);
 }
 
 function bikeScore(minutes: number | null, criteria: Criteria): number {
@@ -139,7 +155,14 @@ function collectRejections(
     rejections.push({
       code: 'type',
       label: 'Type de bien',
-      detail: `${typeLabel(listing.type)} : seuls les studios et les T2 sont retenus`,
+      detail: `${typeLabel(listing.type)} : seuls les T2 sont retenus`,
+    });
+  }
+  if (listing.surface < criteria.minSurface) {
+    rejections.push({
+      code: 'surface',
+      label: 'Trop petit',
+      detail: `${String(listing.surface).replace('.', ',')} m², minimum ${criteria.minSurface} m²`,
     });
   }
   if (criteria.requireFurnished && listing.furnished !== true && listing.type !== 'chambre' && !listing.isShared) {
@@ -183,14 +206,18 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
   const availability = availabilityScore(listing.availableFrom, criteria);
   const comfort = comfortScore(listing);
   const tier = budgetTier(cost, criteria);
+  const aid = estimateApl(rentExcludingCharges(listing, criteria), criteria);
+  const netCost = Math.max(cost - aid.amount, 0);
 
   const scoreParts: ScorePart[] = [
     {
       id: 'prix',
-      label: 'Loyer',
-      points: round1(priceScore(cost, criteria)),
+      label: 'Loyer net',
+      points: round1(priceScore(netCost, criteria)),
       max: 40,
-      detail: `${euro(cost)} charges comprises${estimated ? ' (charges estimées)' : ''}`,
+      detail: `${euro(netCost)} après aide au logement estimée (${euro(cost)} charges comprises${
+        estimated ? ', charges estimées' : ''
+      }), budget idéal ${euro(criteria.idealRent)}`,
     },
     {
       id: 'trajet',
@@ -232,6 +259,8 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
   return {
     ...listing,
     monthlyCost: cost,
+    housingAid: aid.amount,
+    netCost,
     costIsEstimated: estimated,
     estimatedCharges: charges,
     bikeMinutes: trip?.minutes ?? null,

@@ -2,9 +2,10 @@ import { CRITERIA } from './criteria';
 import { normalizeText } from './geo';
 import type { EvaluatedListing, StatusId } from './types';
 
+/** Conservé pour relire les préférences enregistrées ; seuls des T2 sont retenus désormais. */
 export type TypeFilter = 'all' | 'studio' | 'T2';
 export type ZoneFilter = 'coeur' | 'all';
-export type SortKey = 'score' | 'price-asc' | 'price-desc' | 'surface' | 'bike' | 'recent';
+export type SortKey = 'score' | 'net-asc' | 'price-asc' | 'price-desc' | 'surface' | 'bike' | 'recent';
 
 export interface Filters {
   query: string;
@@ -21,7 +22,7 @@ export const DEFAULT_FILTERS: Filters = {
   query: '',
   type: 'all',
   maxCost: CRITERIA.maxRent,
-  minSurface: 0,
+  minSurface: CRITERIA.minSurface,
   minScore: 0,
   // Les annonces qui ne précisent pas le quartier restent visibles : à vérifier une par une.
   zone: 'all',
@@ -30,6 +31,7 @@ export const DEFAULT_FILTERS: Filters = {
 
 export const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: 'score', label: 'Pertinence' },
+  { id: 'net-asc', label: 'Loyer net après APL croissant' },
   { id: 'price-asc', label: 'Loyer croissant' },
   { id: 'price-desc', label: 'Loyer décroissant' },
   { id: 'surface', label: 'Surface décroissante' },
@@ -50,8 +52,6 @@ export function applyFilters(
 ): EvaluatedListing[] {
   const query = normalizeText(filters.query);
   return listings.filter((l) => {
-    if (filters.type === 'studio' && l.type !== 'studio' && l.type !== 'T1') return false;
-    if (filters.type === 'T2' && l.type !== 'T2') return false;
     if (l.monthlyCost > filters.maxCost) return false;
     if (l.surface < filters.minSurface) return false;
     if (l.score < filters.minScore) return false;
@@ -70,6 +70,7 @@ export function sortListings(listings: EvaluatedListing[], sort: SortKey): Evalu
     b.score - a.score || a.monthlyCost - b.monthlyCost;
   const comparators: Record<SortKey, (a: EvaluatedListing, b: EvaluatedListing) => number> = {
     score: byScore,
+    'net-asc': (a, b) => a.netCost - b.netCost || byScore(a, b),
     'price-asc': (a, b) => a.monthlyCost - b.monthlyCost || byScore(a, b),
     'price-desc': (a, b) => b.monthlyCost - a.monthlyCost || byScore(a, b),
     surface: (a, b) => b.surface - a.surface || byScore(a, b),

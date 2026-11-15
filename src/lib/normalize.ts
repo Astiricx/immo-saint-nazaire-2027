@@ -70,8 +70,10 @@ export function detectFurnished(text: string): boolean | null {
   if (/non[\s-]*meubl|pas meubl|location vide|logement vide|appartement vide|studio vide|\bloue vide\b|location nue|\bnon equipe et non meuble/.test(t)) {
     return false;
   }
-  if (/\bmeublé(e|s|es)?\b/.test(raw)) return true;
-  if (/\b(location|studio|appartement|logement|t1|t1 bis|t2|f1|f2|bien|loue|propose|entierement|tout|totalement|equipe et|refait et)\s+(entierement\s+|tout\s+|totalement\s+)?meublee?s?\b/.test(t)) {
+  // « meublé » accentué est toujours l'adjectif (le nom commun s'écrit « meuble »).
+  // Pas de \b après « é » : en JavaScript, « é » n'est pas un caractère de mot.
+  if (/(^|[^a-zà-ÿ])meublé(e|s|es)?(?![a-zà-ÿ])/.test(raw)) return true;
+  if (/\b(location|studio|appartement|logement|t1|t1 bis|t2|f1|f2|bien|loue|propose|entierement|tout|totalement|equipe et|refait et|pieces?|m2)\s+(entierement\s+|tout\s+|totalement\s+)?meublee?s?\b/.test(t)) {
     return true;
   }
   if (/\bmeublee?s?\s*:\s*oui\b|\blmnp\b|bail (de location )?meuble|\bloyer meuble/.test(t)) return true;

@@ -2,6 +2,7 @@
 
 import { Loader2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { CRITERIA } from '@/lib/criteria';
 import { useListingsFile } from '@/lib/data';
 import { evaluate } from '@/lib/evaluate';
 import {
@@ -140,7 +141,8 @@ export function Dashboard() {
   );
 
   const trackedCount = accepted.filter((l) => entryOf(l.id).status !== DEFAULT_STATUS).length;
-  const idealCount = accepted.filter((l) => l.budgetTier === 'ideal').length;
+  // Budget idéal apprécié sur le loyer net, après aide au logement estimée.
+  const idealCount = accepted.filter((l) => l.netCost <= CRITERIA.idealRent).length;
   const selected = selectedId ? (all.find((l) => l.id === selectedId) ?? null) : null;
   const closeDrawer = useCallback(() => setSelectedId(null), []);
   const closeDialog = useCallback(() => setAdding(false), []);

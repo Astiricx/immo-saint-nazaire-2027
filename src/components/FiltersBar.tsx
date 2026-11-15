@@ -9,7 +9,6 @@ import {
   isDefaultFilters,
   type Filters,
   type SortKey,
-  type TypeFilter,
   type ZoneFilter,
 } from '@/lib/filters';
 import { STATUSES } from '@/lib/pipeline';
@@ -86,12 +85,6 @@ function RangeField({
   );
 }
 
-const TYPE_OPTIONS: { id: TypeFilter; label: string }[] = [
-  { id: 'all', label: 'Tous' },
-  { id: 'studio', label: 'Studio' },
-  { id: 'T2', label: 'T2' },
-];
-
 const ZONE_OPTIONS: { id: ZoneFilter; label: string }[] = [
   { id: 'coeur', label: 'Centre et front de mer' },
   { id: 'all', label: 'Tous les quartiers' },
@@ -136,12 +129,6 @@ export function FiltersBar({
             className="field pl-8"
           />
         </div>
-        <Segmented
-          label="Type de bien"
-          value={filters.type}
-          options={TYPE_OPTIONS}
-          onChange={(value) => set('type', value)}
-        />
         <Segmented
           label="Secteur"
           value={filters.zone}
@@ -203,10 +190,10 @@ export function FiltersBar({
         <RangeField
           id="surface-min"
           label="Surface minimum"
-          valueLabel={filters.minSurface > 0 ? `${filters.minSurface} m²` : 'Indifférente'}
-          value={filters.minSurface}
-          min={0}
-          max={45}
+          valueLabel={`${Math.max(filters.minSurface, CRITERIA.minSurface)} m²`}
+          value={Math.max(filters.minSurface, CRITERIA.minSurface)}
+          min={CRITERIA.minSurface}
+          max={60}
           step={5}
           onChange={(value) => set('minSurface', value)}
         />

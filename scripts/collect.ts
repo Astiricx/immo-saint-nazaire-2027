@@ -47,6 +47,7 @@ const SOURCES: ListingSource[] = [
 const REASON_LABELS: Record<RejectionCode, string> = {
   colocation: 'colocation',
   type: 'type de bien',
+  surface: 'moins de 25 m²',
   meuble: 'non meublé',
   budget: 'hors budget',
   distance: 'trop loin à vélo',

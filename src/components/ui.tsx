@@ -11,7 +11,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect } from 'react';
+import { CRITERIA } from '@/lib/criteria';
 import { BUDGET_TIER_LABELS } from '@/lib/evaluate';
+import { euro } from '@/lib/format';
 import { STATUSES } from '@/lib/pipeline';
 import type { BudgetTier, EvaluatedListing, StatusId } from '@/lib/types';
 
@@ -126,4 +128,34 @@ export function useOverlay(onClose: () => void) {
       window.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
+}
+
+/** Ce qui reste à payer chaque mois après l'aide au logement estimée. */
+export function NetRent({
+  listing,
+  size = 'md',
+}: {
+  listing: Pick<EvaluatedListing, 'netCost' | 'housingAid'>;
+  size?: 'md' | 'lg';
+}) {
+  if (!CRITERIA.housingAid.enabled) return null;
+  return (
+    <div className="rounded-md bg-accent/10 px-3 py-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium">Loyer net estimé après APL</span>
+        <span
+          className={`font-display font-semibold leading-none tabular-nums text-accent ${
+            size === 'lg' ? 'text-4xl' : 'text-3xl'
+          }`}
+        >
+          {euro(listing.netCost)}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        {listing.housingAid > 0
+          ? `Aide au logement estimée : ${euro(listing.housingAid)} par mois`
+          : 'Aucune aide au logement estimée pour ce loyer'}
+      </p>
+    </div>
+  );
 }

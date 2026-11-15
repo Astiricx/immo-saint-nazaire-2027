@@ -7,21 +7,43 @@ import type { PropertyType } from './types';
 export const CRITERIA = {
   city: 'Saint-Nazaire',
 
-  /** Studio ou T2 uniquement. Un T1 (studio avec cuisine séparée) est assimilé à un studio. */
-  allowedTypes: ['studio', 'T1', 'T2'] as PropertyType[],
+  /** T2 uniquement : studios et T1 sont écartés. */
+  allowedTypes: ['T2'] as PropertyType[],
+
+  /** Surface habitable minimale, en m². */
+  minSurface: 25,
 
   /** Impératif : seules les annonces clairement identifiées comme meublées sont retenues. */
   requireFurnished: true,
 
-  /** Loyer charges comprises visé. */
+  /** Budget visé. Le score le compare au loyer net, après aide au logement estimée. */
   idealRent: 550,
   /** Seuil intermédiaire : au-delà, on entre dans le « dernier recours ». */
   stretchRent: 650,
-  /** Plafond absolu, charges comprises. */
+  /** Plafond absolu, charges comprises, avant aide au logement. */
   maxRent: 700,
 
   /** Trajet à vélo maximal jusqu'aux Chantiers de l'Atlantique, en minutes. */
   maxBikeMinutes: 20,
+
+  /**
+   * Aide au logement (APL ou ALS, même barème) : profil du locataire pour l'estimation.
+   * Voir src/lib/apl.ts pour le barème.
+   */
+  housingAid: {
+    enabled: true,
+    /**
+     * Zone du barème. Saint-Nazaire (agglomération de plus de 100 000 habitants) relève
+     * normalement de la zone 2 ; la zone 3, plus prudente, donne environ 17 € d'aide en moins.
+     */
+    zone: 3 as 1 | 2 | 3,
+    /** Étudiant : la CAF retient un forfait de ressources, même avec 0 € de revenus. */
+    student: true,
+    /** Boursier : forfait plus bas (6 900 € au lieu de 8 600 €), donc aide plus élevée. */
+    scholarship: false,
+    /** Ressources annuelles réelles, utilisées si elles dépassent le forfait étudiant. */
+    annualIncome: 0,
+  },
 
   /** Emménagement visé : janvier 2027, ou fin 2026. */
   moveIn: {

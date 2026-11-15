@@ -47,11 +47,11 @@ const FR_RESIDENTIAL = {
 };
 
 /**
- * Recherche Leboncoin : locations, Saint-Nazaire (44600), appartements, meublés,
- * 1 ou 2 pièces, 700 € maximum. C'est l'URL que le site lui-même produit avec ces filtres.
+ * Recherche Leboncoin : locations, Saint-Nazaire (44600), appartements meublés de 2 pièces,
+ * 25 m² minimum, 700 € maximum. C'est l'URL que le site lui-même produit avec ces filtres.
  */
 export const LEBONCOIN_SEARCH_URL =
-  `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_44600&real_estate_type=2&furnished=1&rooms=1-2&price=min-${CRITERIA.maxRent}`;
+  `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_44600&real_estate_type=2&furnished=1&rooms=2-2&square=${CRITERIA.minSurface}-max&price=min-${CRITERIA.maxRent}`;
 
 export const APIFY_PORTALS: ApifyPortal[] = [
   {
@@ -116,6 +116,8 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           distributionType: 'Rent',
           estateTypes: ['Apartment'],
           priceMax: CRITERIA.maxRent,
+          roomsMin: 2,
+          spaceMin: CRITERIA.minSurface,
           sortBy: 'DateDesc',
           maxItems: 0,
           maxPages: 0,
@@ -133,7 +135,9 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           postalCodes: ['44600'],
           propertyTypes: ['apartment'],
           priceMax: CRITERIA.maxRent,
+          roomsMin: 2,
           roomsMax: 2,
+          surfaceMin: CRITERIA.minSurface,
           maxResults: NO_LIMIT,
           proxyConfiguration: FR_RESIDENTIAL,
         },
@@ -152,7 +156,9 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           location: CITY,
           operation: 'rent',
           maxPrice: CRITERIA.maxRent,
+          minRooms: 2,
           maxRooms: 2,
+          minSurface: CRITERIA.minSurface,
           furnished: true,
           sortBy: 'relevance',
           maxItems: 0,

@@ -1,6 +1,7 @@
 'use client';
 
 import { CRITERIA } from '@/lib/criteria';
+import { aidProfileLabel, estimateApl } from '@/lib/apl';
 import { euro, formatDateTime } from '@/lib/format';
 import type { ListingsFile } from '@/lib/types';
 import { LoadLine } from './LoadLine';
@@ -30,7 +31,8 @@ export function Brief({
           {data?.generatedAt ? (
             <>
               {accepted} annonce{accepted > 1 ? 's' : ''} retenue{accepted > 1 ? 's' : ''}, dont{' '}
-              {idealCount} dans le budget idéal de {euro(CRITERIA.idealRent)}. Dernière collecte le{' '}
+              {idealCount} à {euro(CRITERIA.idealRent)} ou moins une fois l’aide au logement
+              estimée déduite. Dernière collecte le{' '}
               {formatDateTime(data.generatedAt)} sur {activeSources} source
               {activeSources > 1 ? 's' : ''} ;{' '}
               <a
@@ -39,8 +41,8 @@ export function Brief({
               >
                 {rejected} annonce{rejected > 1 ? 's' : ''} écartée{rejected > 1 ? 's' : ''}
               </a>{' '}
-              automatiquement (non meublés, colocations, loyers au-dessus de{' '}
-              {euro(CRITERIA.maxRent)}, biens trop grands ou trop loin).
+              automatiquement (non meublés, studios, moins de {CRITERIA.minSurface} m², colocations,
+              loyers au-dessus de {euro(CRITERIA.maxRent)}, biens trop grands ou trop loin).
             </>
           ) : (
             <>
@@ -55,7 +57,7 @@ export function Brief({
         <dl className="divide-y divide-line border-y border-line text-sm">
           <div className="flex justify-between gap-4 py-2">
             <dt className="text-muted">Bien</dt>
-            <dd className="text-right font-medium">Studio ou T2 meublé, sans colocation</dd>
+            <dd className="text-right font-medium">T2 meublé, 25 m² minimum, sans colocation</dd>
           </div>
           <div className="flex justify-between gap-4 py-2">
             <dt className="text-muted">Trajet</dt>
@@ -63,6 +65,15 @@ export function Brief({
               {CRITERIA.maxBikeMinutes} min à vélo au maximum
             </dd>
           </div>
+          {CRITERIA.housingAid.enabled ? (
+            <div className="flex justify-between gap-4 py-2">
+              <dt className="text-muted">Aide au logement</dt>
+              <dd className="text-right font-medium">
+                ≈ {euro(estimateApl(CRITERIA.maxRent).amount)} par mois, estimée
+                <span className="block text-xs font-normal text-muted">{aidProfileLabel()}</span>
+              </dd>
+            </div>
+          ) : null}
           <div className="flex justify-between gap-4 py-2">
             <dt className="text-muted">Emménagement</dt>
             <dd className="text-right font-medium">Janvier 2027, ou fin 2026</dd>

@@ -1,6 +1,6 @@
 # Saint-Nazaire 2027
 
-Tableau de bord pour trouver un **studio ou un T2 à Saint-Nazaire**, à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
+Tableau de bord pour trouver un **T2 meublé à Saint-Nazaire**, à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
 
 Chaque matin, une GitHub Action collecte les annonces de location (grands portails, agences, alertes e-mail), écarte celles qui sortent des critères, publie le résultat **chiffré** dans `public/listings.enc.json` et republie le site. Le site déchiffre ce fichier avec votre phrase secrète.
 
@@ -10,9 +10,10 @@ Site : <https://astiricx.github.io/immo-saint-nazaire-2027/>
 
 | Critère | Règle |
 | --- | --- |
-| Type de bien | Studio ou T2. Un T1 est assimilé à un studio. Colocations, chambres, T3 et plus, maisons, parkings écartés. |
+| Type de bien | **T2 uniquement.** Studios, T1, colocations, chambres, T3 et plus, maisons, parkings écartés. |
+| Surface | **25 m² minimum.** |
 | Meublé | **Impératif.** Toute annonce qui n'est pas clairement meublée est écartée : « non meublé » ou « vide », mais aussi une annonce muette sur ce point. |
-| Loyer | 550 € charges comprises visés, 700 € maximum. Au-delà, l'annonce est écartée. |
+| Loyer | 700 € charges comprises maximum : au-delà, l'annonce est écartée. Le budget idéal de 550 € est comparé au **loyer net**, après aide au logement estimée. |
 | Commune | Saint-Nazaire (44600) uniquement. |
 | Trajet | 20 minutes à vélo au maximum jusqu'aux Chantiers, quand l'annonce permet de situer le logement. |
 | Disponibilité | Janvier 2027 ou fin 2026 : compte dans le score, n'écarte pas l'annonce. |
@@ -97,11 +98,23 @@ Node.js 20.9 ou plus récent.
 | `npm test` | Tests de l'extraction, du filtrage et du score |
 | `npm run build` | Vérification des types et export statique dans `out/` |
 
+## Aide au logement et loyer net
+
+Chaque annonce affiche, en plus du loyer charges comprises, le **loyer net estimé après APL** : ce qui reste à payer chaque mois une fois l'aide au logement déduite. La fiche détaille le calcul.
+
+L'estimation applique le barème officiel des aides personnelles au logement (APL et ALS, même formule), en vigueur au 1er octobre 2026, pour un locataire seul :
+
+- **Ressources :** pour un étudiant, la CAF ne retient pas les revenus réels mais un forfait annuel, même sans aucun revenu : 8 600 € pour un non-boursier, 6 900 € pour un boursier.
+- **Zone :** zone 3 par défaut. L'agglomération de Saint-Nazaire dépasse 100 000 habitants, ce qui correspond normalement à la zone 2. La zone 3 est le choix prudent : environ 17 € d'aide en moins par mois.
+- **Résultat :** environ 186 € par mois en zone 3 (203 € en zone 2), quasi identique pour toutes les annonces. Le loyer retenu par la CAF est plafonné à 275 € hors charges, et vos T2 le dépassent tous.
+
+Le profil (zone, boursier, ressources) se règle dans `housingAid`, dans [`src/lib/criteria.ts`](src/lib/criteria.ts), et le barème dans [`src/lib/apl.ts`](src/lib/apl.ts). C'est une estimation : seule la CAF fixe le droit, sur son simulateur. Depuis le 1er juillet 2026, certains étudiants étrangers non boursiers n'y ont plus droit.
+
 ## Score de pertinence
 
 | Critère | Points | Barème |
 | --- | --- | --- |
-| Loyer | 40 | Maximum jusqu'à 550 €, puis dégressif jusqu'à 700 € |
+| Loyer net | 40 | Loyer après aide au logement estimée : 40 points jusqu'à 350 €, 32 au budget idéal de 550 €, puis dégressif jusqu'à 8 à 700 € |
 | Trajet à vélo | 25 | Maximum jusqu'à 8 minutes, dégressif jusqu'à 20 ; 10 points si l'adresse n'est pas précisée |
 | Secteur | 15 | Centre-ville ou front de mer 15, quartier voisin 8, non précisé 5 |
 | Disponibilité | 10 | Maximum entre le 1er décembre 2026 et le 31 janvier 2027 |

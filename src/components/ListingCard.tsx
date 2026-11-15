@@ -5,7 +5,7 @@ import { euro, formatAvailability, formatDate, formatSurface, typeLabel } from '
 import type { TrackEntry } from '@/lib/storage';
 import type { EvaluatedListing, StatusId } from '@/lib/types';
 import { LoadLine } from './LoadLine';
-import { ListingLink, ScoreBadge, StatusSelect, TierTag } from './ui';
+import { ListingLink, NetRent, ScoreBadge, StatusSelect, TierTag } from './ui';
 
 export function ListingCard({
   listing,
@@ -51,6 +51,9 @@ export function ListingCard({
               : `par mois, dont ${euro(l.estimatedCharges)} de charges`}
         </p>
         <LoadLine cost={l.monthlyCost} />
+        <div className="mt-3">
+          <NetRent listing={l} />
+        </div>
       </div>
 
       <ul className="grid gap-2 px-4 py-4 text-sm">

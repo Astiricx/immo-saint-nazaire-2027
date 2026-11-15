@@ -112,8 +112,13 @@ export function KanbanBoard({
                       }`}
                     >
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="font-display text-2xl font-semibold leading-none tabular-nums">
-                          {euro(l.monthlyCost)}
+                        <span>
+                          <span className="font-display text-2xl font-semibold leading-none tabular-nums">
+                            {euro(l.monthlyCost)}
+                          </span>
+                          <span className="ml-1.5 text-sm tabular-nums text-accent">
+                            net {euro(l.netCost)}
+                          </span>
                         </span>
                         <span className="text-sm tabular-nums text-muted" title="Score de pertinence">
                           {l.score} sur 100

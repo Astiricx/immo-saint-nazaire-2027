@@ -14,7 +14,9 @@ import {
 import type { TrackEntry } from '@/lib/storage';
 import type { EvaluatedListing } from '@/lib/types';
 import { LoadLine } from './LoadLine';
-import { ListingLink, ScoreBadge, StatusSelect, TierTag, useOverlay } from './ui';
+import { ListingLink, NetRent, ScoreBadge, StatusSelect, TierTag, useOverlay } from './ui';
+import { aidProfileLabel, APL_SCALE, estimateApl } from '@/lib/apl';
+import { rentExcludingCharges } from '@/lib/evaluate';
 
 /** Panneau latéral : détail de l'annonce, décomposition du score, étape, date de visite et notes. */
 export function ListingDrawer({
@@ -100,6 +102,9 @@ export function ListingDrawer({
             <div className="mt-4">
               <LoadLine cost={l.monthlyCost} showScale />
             </div>
+            <div className="mt-4">
+              <NetRent listing={l} size="lg" />
+            </div>
 
             <ul className="mt-5 grid gap-2.5 text-sm sm:grid-cols-2">
               <li className="flex items-start gap-2">
@@ -130,6 +135,8 @@ export function ListingDrawer({
               </li>
             </ul>
           </section>
+
+          <AidDetails listing={l} />
 
           <section className="border-b border-line p-5">
             <h3 className="font-medium">Votre suivi</h3>
@@ -247,5 +254,38 @@ export function ListingDrawer({
         </footer>
       </aside>
     </div>
+  );
+}
+
+/** Détail de l'estimation de l'aide au logement pour cette annonce. */
+function AidDetails({ listing }: { listing: EvaluatedListing }) {
+  const rentHc = rentExcludingCharges(listing);
+  const aid = estimateApl(rentHc);
+  const rows: [string, string][] = [
+    ['Loyer hors charges', `${euro(rentHc)}${listing.chargesIncluded && listing.charges == null ? ' (charges estimées)' : ''}`],
+    ['Loyer retenu par la CAF (plafonné)', euro(aid.rentRetained)],
+    ['Forfait charges', euro(APL_SCALE.chargesAllowance)],
+    ['Participation personnelle', `− ${euro(aid.participation)}`],
+    ['Aide au logement estimée', euro(aid.amount)],
+    ['Reste à payer chaque mois', euro(listing.netCost)],
+  ];
+  return (
+    <section className="border-b border-line p-5">
+      <h3 className="font-medium">Aide au logement estimée</h3>
+      <dl className="mt-3 divide-y divide-line text-sm">
+        {rows.map(([label, value], i) => (
+          <div key={label} className={`flex justify-between gap-4 py-1.5 ${i >= 4 ? 'font-medium' : ''}`}>
+            <dt className={i >= 4 ? '' : 'text-muted'}>{label}</dt>
+            <dd className="tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        Profil : {aidProfileLabel()}, ressources retenues {euro(aid.income)} par an (forfait étudiant
+        de la CAF, appliqué même sans revenu).
+        {aid.reducedForHighRent ? ' Aide réduite : le loyer dépasse 2,5 fois le plafond de la CAF.' : ''}{' '}
+        Estimation indicative : seule la CAF fixe le montant, sur le simulateur de caf.fr.
+      </p>
+    </section>
   );
 }

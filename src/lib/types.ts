@@ -8,7 +8,7 @@ export type LocationPrecision = 'adresse' | 'quartier' | 'inconnue';
 
 export type BudgetTier = 'ideal' | 'correct' | 'dernier-recours' | 'hors-budget';
 
-export type RejectionCode = 'colocation' | 'type' | 'meuble' | 'budget' | 'distance' | 'ville';
+export type RejectionCode = 'colocation' | 'type' | 'surface' | 'meuble' | 'budget' | 'distance' | 'ville';
 
 export type StatusId =
   | 'a-analyser'
@@ -97,7 +97,12 @@ export interface Rejection {
 
 /** Annonce enrichie : coût mensuel réel, trajet vélo, score et verdict de filtrage. */
 export interface EvaluatedListing extends Listing {
+  /** Loyer mensuel charges comprises. */
   monthlyCost: number;
+  /** Aide au logement mensuelle estimée (APL ou ALS). */
+  housingAid: number;
+  /** Ce qui reste à payer chaque mois : loyer charges comprises moins l'aide estimée. */
+  netCost: number;
   costIsEstimated: boolean;
   estimatedCharges: number;
   /** null quand l'annonce ne permet pas de situer le logement. */
