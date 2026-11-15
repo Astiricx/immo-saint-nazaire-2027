@@ -95,6 +95,20 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     domain: 'seloger.com',
     actors: [
       {
+        // Fonctionne sans offre payante ; sur l'offre gratuite d'Apify : 200 annonces et 10 exécutions maximum.
+        actorId: 'lentic_clockss/seloger-property-scraper',
+        input: {
+          location: 'saint-nazaire',
+          channel: 'RENT',
+          propertyType: 'appartement',
+          maxItems: 500,
+          maxPages: 50,
+          scrapeDetails: true,
+        },
+        furnishedFilter: false,
+      },
+      {
+        // Exige une offre Apify payante (accès aux proxys résidentiels).
         actorId: 'abotapi/seloger-france-scraper',
         input: {
           mode: 'search',
@@ -122,18 +136,6 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           roomsMax: 2,
           maxResults: NO_LIMIT,
           proxyConfiguration: FR_RESIDENTIAL,
-        },
-        furnishedFilter: false,
-      },
-      {
-        actorId: 'lentic_clockss/seloger-property-scraper',
-        input: {
-          location: 'saint-nazaire',
-          channel: 'RENT',
-          propertyType: 'appartement',
-          maxItems: 500,
-          maxPages: 50,
-          scrapeDetails: true,
         },
         furnishedFilter: false,
       },
