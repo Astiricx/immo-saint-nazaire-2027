@@ -235,7 +235,10 @@ function chargesIncluded(item: Item): boolean | null {
   if (typeof flag === 'boolean') return flag;
   const attr = attributeLabel(item, 'charges_included').toLowerCase();
   if (attr) return /oui|yes|\b1\b|compris/.test(attr);
-  const label = toText(first(item, ['priceLabel', 'price_label', 'priceText', 'formattedPrice', 'pricing.label']));
+  const label = [
+    toText(first(item, ['priceLabel', 'price_label', 'priceText', 'formattedPrice', 'priceFormatted', 'pricing.label'])),
+    toText(item.chargesLabel),
+  ].join(' ');
   if (/\bcc\b|charges comprises|charges incluses/i.test(label)) return true;
   if (/\bhc\b|hors charges/i.test(label)) return false;
   return null;
@@ -262,7 +265,11 @@ export function toRawListing(
   );
   if (!rent || !surface) return null;
 
-  const charges = toNumber(first(item, ['charges', 'chargesAmount', 'monthlyCharges', 'pricing.charges', 'serviceCharges']));
+  const chargesLabel = toText(item.chargesLabel);
+  const charges = toNumber(
+    first(item, ['charges', 'chargesAmount', 'monthlyCharges', 'pricing.charges', 'serviceCharges']) ??
+      (/\d/.test(chargesLabel) ? chargesLabel : undefined),
+  );
   const included = chargesIncluded(item);
   const priceText =
     included === true

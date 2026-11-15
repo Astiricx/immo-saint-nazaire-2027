@@ -456,3 +456,11 @@ test('Apify : résultat SeLoger (prix texte, surface area_m2) converti', async (
   assert.equal(listing.furnished, true);
   assert.equal(listing.type, 'T2');
 });
+
+test('Apify : libellé de charges SeLoger', async () => {
+  const { toRawListing, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const portal = APIFY_PORTALS.find((p) => p.id === 'seloger')!;
+  const base = { url: 'https://www.seloger.com/annonces/x.htm', title: 'Studio', priceAmount: 480, surface: 22, city: 'Saint-Nazaire', zipCode: '44600' };
+  assert.equal(toRawListing({ ...base, chargesLabel: 'Charges comprises' }, portal)!.priceText, '480 € CC');
+  assert.equal(toRawListing({ ...base, chargesLabel: '+ 35 € de charges' }, portal)!.priceText, '480 € + 35 € de charges');
+});
