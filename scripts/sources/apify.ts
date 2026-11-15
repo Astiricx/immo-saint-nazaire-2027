@@ -43,6 +43,12 @@ const CITY = 'Saint-Nazaire';
 const POSTCODE = '44600';
 // Volumes : chaque Actor reçoit son maximum accepté (1000 en général), très au-dessus du nombre
 // d'annonces de Saint-Nazaire : aucune annonce n'est écartée faute de place.
+/**
+ * Clé à ajouter à une recherche (jamais transmise à l'Actor) : ses résultats viennent d'une page
+ * déjà filtrée sur « meublé » par le portail.
+ */
+const FURNISHED_SEARCH = '__furnishedSearch';
+
 const FR_RESIDENTIAL = {
   useApifyProxy: true,
   apifyProxyGroups: ['RESIDENTIAL'],
@@ -104,6 +110,10 @@ const pigeImmo = (source: string, proxy: Record<string, unknown>): ApifyActor =>
   furnishedFilter: false,
 });
 
+/**
+ * Ordre de passage : du plus rentable au plus coûteux. SeLoger passe en dernier : c'est le plus cher
+ * (environ 0,36 $ par collecte pour peu d'annonces retenues) et Logic-Immo en reprend une partie.
+ */
 export const APIFY_PORTALS: ApifyPortal[] = [
   {
     id: 'leboncoin',
@@ -127,61 +137,6 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         actorId: 'crawloop/leboncoin-scraper',
         input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: 1000, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: true,
-      },
-    ],
-  },
-  {
-    id: 'seloger',
-    label: 'SeLoger',
-    domain: 'seloger.com',
-    actors: [
-      {
-        // Recherche par ville, appartements puis maisons. L'Actor n'accepte pas les URL de recherche
-        // filtrées (loyer, surface) : le filtrage se fait ensuite. Le portail ne publie pas de champ
-        // « meublé » : il est lu dans le texte et les caractéristiques de l'annonce.
-        actorId: 'lentic_clockss/seloger-property-scraper',
-        input: ['appartement', 'maison'].map((propertyType) => ({
-          location: 'saint-nazaire',
-          channel: 'RENT',
-          propertyType,
-          maxItems: 500,
-          maxPages: 50,
-          scrapeDetails: true,
-        })),
-        furnishedFilter: false,
-      },
-      {
-        // Exige une offre Apify payante (accès aux proxys résidentiels).
-        actorId: 'abotapi/seloger-france-scraper',
-        input: {
-          mode: 'search',
-          locations: [POSTCODE],
-          distributionType: 'Rent',
-          estateTypes: ['Apartment', 'House'],
-          priceMax: SEARCH_MAX_RENT,
-          spaceMin: CRITERIA.minSurface,
-          sortBy: 'DateDesc',
-          maxItems: 0,
-          maxPages: 0,
-          // Fiche complète : la description dit si le logement est meublé.
-          getDetails: true,
-          proxy: FR_RESIDENTIAL,
-        },
-        furnishedFilter: false,
-      },
-      {
-        actorId: 'dltik/seloger-scraper',
-        input: {
-          transaction: 'rent',
-          cities: [CITY],
-          postalCodes: [POSTCODE],
-          propertyTypes: ['apartment', 'house'],
-          priceMax: SEARCH_MAX_RENT,
-          surfaceMin: CRITERIA.minSurface,
-          maxResults: 1000,
-          proxyConfiguration: FR_RESIDENTIAL,
-        },
-        furnishedFilter: false,
       },
     ],
   },
@@ -256,13 +211,78 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     actors: [
       {
         // Payé à l'annonce, proxys compris. La première recherche ne contient que des meublés.
+        // ParuVendu ne dit pas toujours « meublé » dans le texte : la page des meublés est lue à part.
         actorId: 'tagadanar/french-real-estate-paruvendu',
-        input: { searchUrls: PARUVENDU_SEARCH_URLS, scrapeDetails: true, maxResults: 1000, maxPagesPerUrl: 20 },
+        input: [
+          {
+            searchUrls: [PARUVENDU_CATEGORY_URLS[0]],
+            scrapeDetails: true,
+            maxResults: 1000,
+            maxPagesPerUrl: 20,
+            [FURNISHED_SEARCH]: true,
+          },
+          { searchUrls: PARUVENDU_SEARCH_URLS, scrapeDetails: true, maxResults: 1000, maxPagesPerUrl: 20 },
+        ],
         furnishedFilter: false,
       },
       {
         actorId: 'tagadanar/french-real-estate-paruvendu',
         input: { searchUrls: PARUVENDU_CATEGORY_URLS, scrapeDetails: true, maxResults: 1000, maxPagesPerUrl: 20 },
+        furnishedFilter: false,
+      },
+    ],
+  },
+  {
+    id: 'seloger',
+    label: 'SeLoger',
+    domain: 'seloger.com',
+    actors: [
+      {
+        // Recherche par ville, appartements puis maisons. L'Actor n'accepte pas les URL de recherche
+        // filtrées (loyer, surface) : le filtrage se fait ensuite. Le portail ne publie pas de champ
+        // « meublé » : il est lu dans le texte et les caractéristiques de l'annonce.
+        actorId: 'lentic_clockss/seloger-property-scraper',
+        input: ['appartement', 'maison'].map((propertyType) => ({
+          location: 'saint-nazaire',
+          channel: 'RENT',
+          propertyType,
+          maxItems: 500,
+          maxPages: 50,
+          scrapeDetails: true,
+        })),
+        furnishedFilter: false,
+      },
+      {
+        // Exige une offre Apify payante (accès aux proxys résidentiels).
+        actorId: 'abotapi/seloger-france-scraper',
+        input: {
+          mode: 'search',
+          locations: [POSTCODE],
+          distributionType: 'Rent',
+          estateTypes: ['Apartment', 'House'],
+          priceMax: SEARCH_MAX_RENT,
+          spaceMin: CRITERIA.minSurface,
+          sortBy: 'DateDesc',
+          maxItems: 0,
+          maxPages: 0,
+          // Fiche complète : la description dit si le logement est meublé.
+          getDetails: true,
+          proxy: FR_RESIDENTIAL,
+        },
+        furnishedFilter: false,
+      },
+      {
+        actorId: 'dltik/seloger-scraper',
+        input: {
+          transaction: 'rent',
+          cities: [CITY],
+          postalCodes: [POSTCODE],
+          propertyTypes: ['apartment', 'house'],
+          priceMax: SEARCH_MAX_RENT,
+          surfaceMin: CRITERIA.minSurface,
+          maxResults: 1000,
+          proxyConfiguration: FR_RESIDENTIAL,
+        },
         furnishedFilter: false,
       },
     ],
@@ -579,6 +599,15 @@ export class CreditExhaustedError extends Error {
   }
 }
 
+/**
+ * Garde-fou du crédit : une exécution n'est lancée que s'il reste au moins MAX_RUN_COST_USD
+ * de crédit ce mois-ci. Sans réponse de l'API, on laisse faire (le plafond par exécution s'applique).
+ */
+async function creditAllowsRun(): Promise<boolean> {
+  const usage = await apifyUsage();
+  return !usage || usage.limit - usage.used >= MAX_RUN_COST_USD;
+}
+
 /** Consommation du mois sur le compte Apify, en dollars : { used, limit }, si l'API la donne. */
 export async function apifyUsage(): Promise<{ used: number; limit: number } | null> {
   try {
@@ -703,10 +732,20 @@ export function apifySource(portal: ApifyPortal): ListingSource {
       const before = await apifyUsage();
       for (const actor of portal.actors) {
         const items: Item[] = [];
+        /** Résultats issus d'une recherche déjà filtrée sur « meublé ». */
+        const fromFurnishedSearch = new Set<Item>();
         let lastError: string | null = null;
-        for (const input of Array.isArray(actor.input) ? actor.input : [actor.input]) {
+        for (const search of Array.isArray(actor.input) ? actor.input : [actor.input]) {
+          const { [FURNISHED_SEARCH]: furnishedSearch, ...input } = search;
+          if (!(await creditAllowsRun())) {
+            lastError = `crédit Apify presque épuisé (réserve de ${MAX_RUN_COST_USD} $) : exécution reportée`;
+            console.log(`  ${actor.actorId} : ${lastError}`);
+            break;
+          }
           try {
-            items.push(...(await runActor(actor, input)));
+            const batch = await runActor(actor, input);
+            items.push(...batch);
+            if (furnishedSearch === true) batch.forEach((item) => fromFurnishedSearch.add(item));
           } catch (error) {
             if (error instanceof CreditExhaustedError) throw error;
             lastError = (error as Error).message;
@@ -718,7 +757,7 @@ export function apifySource(portal: ApifyPortal): ListingSource {
           continue;
         }
         const listings = items
-          .map((item) => toRawListing(item, portal, actor.furnishedFilter))
+          .map((item) => toRawListing(item, portal, actor.furnishedFilter || fromFurnishedSearch.has(item)))
           .filter((l): l is RawListing => l !== null);
         console.log(`  ${actor.actorId} : ${items.length} résultat(s), ${listings.length} converti(s)`);
         if (debug) {
