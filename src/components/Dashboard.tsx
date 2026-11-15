@@ -33,6 +33,7 @@ import { KanbanBoard } from './KanbanBoard';
 import { ListingCard } from './ListingCard';
 import { ListingDrawer } from './ListingDrawer';
 import { ListingsTable } from './ListingsTable';
+import { NewListings } from './NewListings';
 import { UnlockScreen } from './UnlockScreen';
 
 interface Prefs {
@@ -168,6 +169,16 @@ export function Dashboard() {
               idealCount={idealCount}
               data={data}
             />
+
+            {data ? (
+              <div className="mb-6">
+                <NewListings
+                  listings={collected.filter((l) => l.accepted)}
+                  generatedAt={data.generatedAt}
+                  onOpen={setSelectedId}
+                />
+              </div>
+            ) : null}
 
             <FiltersBar
               filters={prefs.filters}

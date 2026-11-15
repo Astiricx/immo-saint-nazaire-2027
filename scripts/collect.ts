@@ -19,7 +19,7 @@ import { CRITERIA } from '../src/lib/criteria';
 import { decryptJson, encryptJson, isEncryptedFile } from '../src/lib/crypto';
 import { evaluate } from '../src/lib/evaluate';
 import { euro } from '../src/lib/format';
-import { RETENTION_DAYS, mergeWithHistory, type HistoryEntry } from '../src/lib/history';
+import { RETENTION_DAYS, mergeWithHistory, newListingsOf, type HistoryEntry } from '../src/lib/history';
 import { dedupe, normalizeListing, withCoordinates } from '../src/lib/normalize';
 import type {
   Listing,
@@ -260,6 +260,7 @@ async function main() {
       fresh: merge.fresh,
       carried: merge.carried,
       expired: merge.expired,
+      newToday: newListingsOf(keptListings, today).length,
     },
     listings: keptListings,
   };
@@ -280,6 +281,7 @@ async function main() {
   const lines = [
     `Critères : meublé, ${CRITERIA.minSurface} m² minimum (T2, T3, T4, maison), sans colocation, ${euro(CRITERIA.maxNetRent)} net maximum après aide au logement estimée, ${CRITERIA.maxBikeMinutes} min à vélo des Chantiers.`,
     `${collected.length} annonce(s) collectée(s), ${removed} doublon(s), ${unreadable} illisible(s).`,
+    `Nouvelles annonces aujourd'hui (absentes des collectes précédentes) : ${newListingsOf(keptListings, today).length}.`,
     `Historique : ${previous?.listings.length ?? 0} annonce(s) dans le fichier précédent${
       history.length > previousEntries.length ? `, ${history.length} entrée(s) relue(s) dans l'historique git` : ''
     } ; publiées : ${keptListings.length} = ${merge.fresh} revue(s) aujourd'hui + ${merge.carried} conservée(s) des collectes précédentes (${RETENTION_DAYS} jours glissants) ; ${merge.expired} retirée(s) ; ${merge.duplicates} doublon(s) fusionné(s).`,

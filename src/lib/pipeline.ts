@@ -12,8 +12,9 @@ export const STATUSES: Status[] = [
   { id: 'contacte', label: 'Contacté', hint: 'Message envoyé ou appel passé' },
   { id: 'visite', label: 'Visite planifiée', hint: 'Créneau fixé' },
   { id: 'dossier', label: 'Dossier envoyé', hint: 'En attente de réponse' },
+  { id: 'coup-de-coeur', label: 'Coup de cœur', hint: 'Premier choix, à suivre de près' },
+  { id: 'a-creuser', label: 'À creuser', hint: 'Intéressant, mais pas un premier choix' },
   { id: 'refuse', label: 'Refusé', hint: 'Écarté ou dossier non retenu' },
-  { id: 'coup-de-coeur', label: 'Coup de cœur', hint: 'À suivre de près' },
 ];
 
 export const DEFAULT_STATUS: StatusId = 'a-analyser';

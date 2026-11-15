@@ -15,6 +15,7 @@ const EMPTY_HINTS: Record<StatusId, string> = {
   dossier: 'Déposez ici les annonces pour lesquelles le dossier est parti.',
   refuse: 'Les annonces abandonnées ou refusées arrivent ici.',
   'coup-de-coeur': 'Gardez ici vos annonces favorites.',
+  'a-creuser': 'Rangez ici les biens intéressants qui ne sont pas un premier choix.',
 };
 
 /** Suivi des annonces par étape : glisser-déposer à la souris, liste déroulante au tactile et au clavier. */
@@ -50,7 +51,7 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="grid grid-cols-1 items-start gap-3 py-6 md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-1 items-start gap-3 py-6 md:grid-cols-4 xl:grid-cols-7 xl:gap-2.5">
       {STATUSES.map((status) => {
         const Icon = STATUS_ICONS[status.id];
         const items = columns.get(status.id) ?? [];
@@ -111,19 +112,15 @@ export function KanbanBoard({
                         draggedId === l.id ? 'opacity-50' : ''
                       }`}
                     >
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span>
-                          <span className="font-display text-2xl font-semibold leading-none tabular-nums">
-                            {euro(l.monthlyCost)}
-                          </span>
-                          <span className="ml-1.5 text-sm tabular-nums text-accent">
-                            net {euro(l.netCost)}
-                          </span>
-                        </span>
-                        <span className="text-sm tabular-nums text-muted" title="Score de pertinence">
-                          {l.score} sur 100
-                        </span>
-                      </div>
+                      <p className="font-display text-2xl font-semibold leading-none tabular-nums">
+                        {euro(l.netCost)}
+                        <span className="ml-1 font-sans text-sm font-normal text-accent">net</span>
+                      </p>
+                      <p className="mt-1 text-xs tabular-nums text-muted">
+                        <abbr title="charges comprises" className="no-underline">{euro(l.monthlyCost)} CC</abbr>
+                        {' − '}
+                        {euro(l.housingAid)} d’aide
+                      </p>
                       <h3 className="mt-1.5 text-sm font-medium leading-snug">
                         <button
                           type="button"
@@ -133,9 +130,14 @@ export function KanbanBoard({
                           {typeLabel(l.type)} de {formatSurface(l.surface)}, {l.districtName}
                         </button>
                       </h3>
-                      <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted">
-                        <Bike className="size-4 shrink-0" aria-hidden />
-                        {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'Trajet à vérifier'}
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Bike className="size-4 shrink-0" aria-hidden />
+                          {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'Trajet à vérifier'}
+                        </span>
+                        <span className="tabular-nums" title="Score de pertinence sur 100">
+                          Score {l.score}
+                        </span>
                       </p>
                       {entry.visitDate ? (
                         <p className="mt-1 flex items-center gap-1.5 text-sm">

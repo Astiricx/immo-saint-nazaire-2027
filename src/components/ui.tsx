@@ -2,6 +2,7 @@
 
 import {
   Ban,
+  Bookmark,
   CalendarCheck,
   ExternalLink,
   Heart,
@@ -24,6 +25,7 @@ export const STATUS_ICONS: Record<StatusId, LucideIcon> = {
   dossier: Send,
   refuse: Ban,
   'coup-de-coeur': Heart,
+  'a-creuser': Bookmark,
 };
 
 export function ScoreBadge({ score, large = false }: { score: number; large?: boolean }) {

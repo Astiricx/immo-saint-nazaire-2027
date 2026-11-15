@@ -83,7 +83,8 @@ GitHub suspend les tâches planifiées d'un dépôt resté 60 jours sans activit
 
 - **Annonces** en cartes ou en tableau : loyer charges comprises, surface, type, quartier, trajet à vélo, disponibilité, score et lien vers l'annonce d'origine.
 - **Filtres et tris** : recherche libre, type, secteur, loyer, surface, score, étape du suivi.
-- **Suivi Kanban** : À analyser, Contacté, Visite planifiée, Dossier envoyé, Refusé, Coup de cœur, avec notes et date de visite.
+- **Nouveautés du jour** : en tête du tableau de bord, les annonces vues pour la première fois lors de la dernière collecte (absentes des collectes précédentes), avec leur lien direct.
+- **Suivi Kanban** : À analyser, Contacté, Visite planifiée, Dossier envoyé, Coup de cœur, À creuser (intéressant, mais pas un premier choix), Refusé, avec notes et date de visite.
 - **Ajout manuel** d'une annonce repérée ailleurs, filtrée et notée comme les autres.
 - **Persistance locale** (`localStorage`) du suivi et des préférences, export et import en JSON.
 - Thème clair ou sombre, interface responsive.

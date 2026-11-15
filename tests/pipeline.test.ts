@@ -632,3 +632,20 @@ test('historique : une source en panne ne marque pas ses annonces « plus revues
   assert.equal(mergeWithHistory([], history, '2026-11-15', 30, new Set(['leboncoin'])).listings[0].stillListed, true);
   assert.equal(mergeWithHistory([], history, '2026-11-15').listings[0].stillListed, false);
 });
+
+test('nouveautés : seules les annonces vues pour la première fois le jour de la collecte', async () => {
+  const { newListingsOf } = await import('../src/lib/history');
+  const old = listing({ id: 'a', firstSeen: '2026-11-14' });
+  const fresh = listing({ id: 'b', firstSeen: '2026-11-15' });
+  assert.deepEqual(newListingsOf([old, fresh], '2026-11-15T07:21:03.000Z').map((l) => l.id), ['b']);
+  assert.deepEqual(newListingsOf([old], '2026-11-15T07:21:03.000Z'), []);
+});
+
+test('suivi : « À creuser » entre « Coup de cœur » et « Refusé »', async () => {
+  const { STATUSES, isStatusId } = await import('../src/lib/pipeline');
+  const ids = STATUSES.map((s) => s.id);
+  assert.equal(ids.indexOf('a-creuser'), ids.indexOf('coup-de-coeur') + 1);
+  assert.equal(ids.indexOf('refuse'), ids.indexOf('a-creuser') + 1);
+  assert.ok(isStatusId('a-creuser'));
+  assert.equal(STATUSES.find((s) => s.id === 'a-creuser')!.label, 'À creuser');
+});

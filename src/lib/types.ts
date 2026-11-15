@@ -16,7 +16,9 @@ export type StatusId =
   | 'visite'
   | 'dossier'
   | 'refuse'
-  | 'coup-de-coeur';
+  | 'coup-de-coeur'
+  /** Option secondaire : entre « Coup de cœur » et « Refusé ». */
+  | 'a-creuser';
 
 /** Annonce telle qu'elle sort d'une source : des textes libres, pas encore de chiffres. */
 export interface RawListing {
@@ -152,6 +154,8 @@ export interface ListingsFile {
     carried?: number;
     /** Annonces retirées de l'historique : plus revues depuis trop longtemps, ou hors critères. */
     expired?: number;
+    /** Annonces vues pour la première fois le jour de cette collecte. */
+    newToday?: number;
   };
   /** Uniquement les annonces qui respectent les critères, cumulées sur l'historique glissant. */
   listings: Listing[];

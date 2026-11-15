@@ -29,6 +29,15 @@ export function canonicalUrl(url: string): string {
 const daysBetween = (from: string, to: string) =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 
+/**
+ * Annonces découvertes lors de la dernière collecte : vues pour la première fois le jour de
+ * cette collecte, donc absentes de l'historique des jours précédents.
+ */
+export function newListingsOf<T extends Listing>(listings: T[], generatedAt: string): T[] {
+  const day = generatedAt.slice(0, 10);
+  return listings.filter((l) => l.firstSeen === day);
+}
+
 export interface HistoryEntry {
   listing: Listing;
   /** Date (AAAA-MM-JJ) de la collecte qui a produit ce fichier, à défaut de lastSeen. */
