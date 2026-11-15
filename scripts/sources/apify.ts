@@ -108,8 +108,9 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     domain: 'leboncoin.fr',
     actors: [
       {
+        // 1000 est le maximum accepté par cet Actor, bien au-delà des annonces de la recherche.
         actorId: 'data_alchemist/leboncoin',
-        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxResults: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
+        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxResults: 1000, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: true,
       },
       {
@@ -117,19 +118,8 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: true,
       },
-      {
-        // Recherche par code postal, sans filtre meublé : le filtrage strict se fait ensuite.
-        actorId: 'xtracto/leboncoin-listings',
-        input: {
-          category: '10',
-          locations: [POSTCODE],
-          priceMax: SEARCH_MAX_RENT,
-          sortBy: 'time',
-          maxResults: 0,
-          proxyConfiguration: FR_RESIDENTIAL,
-        },
-        furnishedFilter: false,
-      },
+      // xtracto/leboncoin-listings a été retiré : sa recherche par code postal ramenait des centaines
+      // d'annonces hors Saint-Nazaire et non meublées, et a épuisé le crédit Apify mensuel en une exécution.
       {
         actorId: 'crawloop/leboncoin-scraper',
         input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
@@ -237,17 +227,6 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         furnishedFilter: false,
       },
       pigeImmo('pap', { useApifyProxy: true }),
-      {
-        actorId: 'scrapifier/pap-universal-scraper',
-        input: {
-          transaction: 'rent',
-          locations: [CITY],
-          property_types: ['appartement', 'maison'],
-          max_results: NO_LIMIT,
-          proxyConfiguration: FR_RESIDENTIAL,
-        },
-        furnishedFilter: false,
-      },
     ],
   },
   {
@@ -570,6 +549,11 @@ function fieldCoverage(items: Item[]): string {
 }
 
 const API = 'https://api.apify.com/v2';
+/**
+ * Coût maximal d'une exécution d'Actor payé au résultat, en dollars : une recherche mal comprise
+ * par un Actor ne peut pas consommer tout le crédit Apify du mois.
+ */
+const MAX_RUN_COST_USD = 0.75;
 /** Durée maximale d'une exécution d'Actor (la collecte complète d'un portail). */
 const RUN_TIMEOUT_MS = 25 * 60 * 1000;
 
@@ -590,10 +574,37 @@ async function apify(path: string, init: RequestInit = {}): Promise<Response> {
 function httpHint(status: number, actorId: string): string {
   if (status === 401) return 'jeton APIFY_TOKEN refusé';
   if (status === 402) return 'crédit Apify épuisé';
-  if (status === 403) return `accès refusé à l'Actor ${actorId} (location payante non souscrite ?)`;
+  if (status === 403) return `accès refusé à l'Actor ${actorId}`;
   if (status === 404) return `Actor ${actorId} introuvable`;
   if (status === 400) return `paramètres refusés par l'Actor ${actorId}`;
   return `HTTP ${status}`;
+}
+
+/** Crédit Apify du mois épuisé : inutile d'essayer les autres Actors avant la remise à zéro. */
+export class CreditExhaustedError extends Error {
+  constructor(renewal?: string) {
+    super(
+      `crédit Apify du mois épuisé : les portails reprendront ${
+        renewal ? `le ${renewal}, au renouvellement du crédit` : 'au renouvellement du crédit'
+      }, ou plus tôt avec une offre Apify payante`,
+    );
+  }
+}
+
+/** Date de renouvellement du crédit mensuel Apify, au format jj/mm/aaaa, si l'API la donne. */
+async function creditRenewal(): Promise<string | undefined> {
+  try {
+    const response = await apify('/users/me/limits');
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { data?: { monthlyUsageCycle?: { endAt?: string } } };
+    const end = body.data?.monthlyUsageCycle?.endAt;
+    if (!end) return undefined;
+    // Le crédit revient le lendemain de la fin du cycle.
+    const next = new Date(new Date(end).getTime() + 1000);
+    return next.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+  } catch {
+    return undefined;
+  }
 }
 
 /** Chemins des champs dont le nom évoque « meublé » : vérifie la lecture sans rien dévoiler des annonces. */
@@ -618,9 +629,13 @@ function furnishedPaths(items: Item[]): string {
 /** Lance un Actor, attend la fin de l'exécution et renvoie tout son jeu de données. */
 export async function runActor(actor: ApifyActor, input: Record<string, unknown>): Promise<Item[]> {
   const id = actor.actorId.replace('/', '~');
-  const start = await apify(`/acts/${id}/runs`, { method: 'POST', body: JSON.stringify(input) });
+  const start = await apify(`/acts/${id}/runs?maxTotalChargeUsd=${MAX_RUN_COST_USD}`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
   if (!start.ok) {
     const detail = (await start.text()).slice(0, 200).replace(/\s+/g, ' ');
+    if (/actor-disabled|monthly usage|usage limit/i.test(detail)) throw new CreditExhaustedError(await creditRenewal());
     throw new Error(`${httpHint(start.status, actor.actorId)} — ${detail}`);
   }
   let run = ((await start.json()) as { data: { id: string; status: string; defaultDatasetId: string; statusMessage?: string } }).data;
@@ -673,6 +688,7 @@ export function apifySource(portal: ApifyPortal): ListingSource {
           try {
             items.push(...(await runActor(actor, input)));
           } catch (error) {
+            if (error instanceof CreditExhaustedError) throw error;
             lastError = (error as Error).message;
             console.log(`  ${actor.actorId} : ${lastError}`);
           }
