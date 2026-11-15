@@ -432,3 +432,27 @@ test('Leboncoin : l’URL de recherche porte tous les critères', async () => {
   assert.equal(url.searchParams.get('locations'), 'Saint-Nazaire_44600');
   for (const portal of APIFY_PORTALS) assert.ok(portal.actors.length >= 1, portal.id);
 });
+
+test('Apify : résultat SeLoger (prix texte, surface area_m2) converti', async () => {
+  const { toRawListing, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const portal = APIFY_PORTALS.find((p) => p.id === 'seloger')!;
+  const raw = toRawListing(
+    {
+      url: 'https://www.seloger.com/annonces/locations/appartement/saint-nazaire-44/centre-ville/250000001.htm',
+      title: 'Appartement 2 pièces',
+      price: '620 EUR',
+      price_numeric: 620,
+      area_m2: 41,
+      rooms: 2,
+      city: 'Saint-Nazaire',
+      zipcode: '44600',
+      description: 'T2 meublé en centre-ville, proche des Halles.',
+    },
+    portal,
+  )!;
+  assert.equal(raw.surfaceText, '41 m²');
+  assert.match(raw.priceText, /^620 €/);
+  const listing = normalizeListing(raw, TODAY)!;
+  assert.equal(listing.furnished, true);
+  assert.equal(listing.type, 'T2');
+});

@@ -53,12 +53,6 @@ const FR_RESIDENTIAL = {
 export const LEBONCOIN_SEARCH_URL =
   `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_44600&real_estate_type=2&furnished=1&rooms=1-2&price=min-${CRITERIA.maxRent}`;
 
-/**
- * Recherche SeLoger : locations d'appartements à Saint-Nazaire. SeLoger désigne les villes par un
- * identifiant interne non public ; cette adresse « classique » est acceptée par les Actors.
- */
-export const SELOGER_SEARCH_URL = 'https://www.seloger.com/immobilier/locations/immo-saint-nazaire-44/bien-appartement/';
-
 export const APIFY_PORTALS: ApifyPortal[] = [
   {
     id: 'leboncoin',
@@ -101,35 +95,47 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     domain: 'seloger.com',
     actors: [
       {
-        actorId: 'crawloop/seloger-scraper',
+        actorId: 'abotapi/seloger-france-scraper',
         input: {
-          startUrls: [{ url: SELOGER_SEARCH_URL }],
-          maxPrice: CRITERIA.maxRent,
-          maxRooms: 2,
-          maxItems: NO_LIMIT,
+          mode: 'search',
+          locations: ['44600'],
+          distributionType: 'Rent',
+          estateTypes: ['Apartment'],
+          priceMax: CRITERIA.maxRent,
+          sortBy: 'DateDesc',
+          maxItems: 0,
+          maxPages: 0,
           // Fiche complète : la description dit si le logement est meublé.
-          includeDetails: true,
+          getDetails: true,
+          proxy: FR_RESIDENTIAL,
+        },
+        furnishedFilter: false,
+      },
+      {
+        actorId: 'dltik/seloger-scraper',
+        input: {
+          transaction: 'rent',
+          cities: [CITY],
+          postalCodes: ['44600'],
+          propertyTypes: ['apartment'],
+          priceMax: CRITERIA.maxRent,
+          roomsMax: 2,
+          maxResults: NO_LIMIT,
           proxyConfiguration: FR_RESIDENTIAL,
         },
         furnishedFilter: false,
       },
       {
-        actorId: 'automation-lab/seloger-property-listings-scraper',
-        input: { startUrls: [{ url: SELOGER_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
-        furnishedFilter: false,
-      },
-      {
-        actorId: 'igolaizola/seloger-scraper',
+        actorId: 'lentic_clockss/seloger-property-scraper',
         input: {
-          location: CITY,
-          operation: 'rent',
-          propertyType: 'apartment',
-          furnished: 'furnished',
-          maxPrice: CRITERIA.maxRent,
-          maxRooms: 2,
-          maxItems: 0,
+          location: 'saint-nazaire',
+          channel: 'RENT',
+          propertyType: 'appartement',
+          maxItems: 500,
+          maxPages: 50,
+          scrapeDetails: true,
         },
-        furnishedFilter: true,
+        furnishedFilter: false,
       },
     ],
   },
@@ -248,10 +254,10 @@ export function toRawListing(
   if (!/^https?:\/\//i.test(url) || !url.includes(portal.domain)) return null;
 
   const rent = toNumber(
-    first(item, ['price', 'rent', 'monthlyRent', 'pricing.price', 'pricing.rent', 'priceValue', 'price_value']),
+    first(item, ['price_numeric', 'priceAmount', 'price', 'rent', 'monthlyRent', 'pricing.price', 'pricing.rent', 'priceValue', 'price_value']),
   );
   const surface = toNumber(
-    first(item, ['surfaceArea', 'surface', 'livingArea', 'livingSpace', 'area', 'size', 'surface_m2', 'squareMeters']) ??
+    first(item, ['surfaceArea', 'surface', 'area_m2', 'livingArea', 'living_area', 'livingSpace', 'area', 'size', 'surface_m2', 'squareMeters']) ??
       attribute(item, ['square', 'surface', 'living_area']),
   );
   if (!rent || !surface) return null;
