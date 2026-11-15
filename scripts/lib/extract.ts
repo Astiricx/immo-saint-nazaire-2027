@@ -1,5 +1,5 @@
 import { normalizeText } from '../../src/lib/geo';
-import { parseAmounts } from '../../src/lib/normalize';
+import { detectFurnished, parseAmounts } from '../../src/lib/normalize';
 import type { RawListing } from '../../src/lib/types';
 import { extractJsonLd, extractMeta, extractTitle, htmlToText } from './html';
 
@@ -21,6 +21,8 @@ export interface Extracted {
   availabilityText: string | null;
   lat: number | null;
   lng: number | null;
+  /** true meublé, false vide, null non précisé. */
+  furnished: boolean | null;
   /** Début du texte utile de la page, pour le mode --debug. */
   excerpt?: string;
 }
@@ -220,6 +222,18 @@ const LABEL_CHARGES = /montant des charges|provisions? (?:pour|sur) charges|char
 const LABEL_RENT = /loyer(?: mensuel)?(?=\s*[:\n]|\s*$)/i;
 const LABEL_AVAILABILITY = /(?:date de )?disponibilit[ée]/i;
 
+/** Champ « Meublé : Oui / Non », sinon les mentions du texte. */
+export function findFurnished(text: string, title = ''): boolean | null {
+  const lines = text.split('\n').map((l) => l.trim());
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!/^(meubl[ée]e?|ameublement|location meubl[ée]e)\s*:?\s*(oui|non)?$/i.test(lines[i])) continue;
+    const value = `${lines[i]} ${lines[i + 1] ?? ''}`.toLowerCase();
+    if (/\boui\b|\byes\b/.test(value)) return true;
+    if (/\bnon\b|\bno\b/.test(value)) return false;
+  }
+  return detectFurnished(`${title}\n${text}`);
+}
+
 /** Extraction depuis un bloc de texte (annonce dans un e-mail d'alerte, par exemple). */
 export function extractFromText(text: string, title = ''): Extracted {
   const fields = labeledRent(text);
@@ -241,6 +255,7 @@ export function extractFromText(text: string, title = ''): Extracted {
     availabilityText: availability ? `Disponible le ${availability}` : findAvailability(text),
     lat: null,
     lng: null,
+    furnished: findFurnished(text, title),
   };
 }
 
@@ -285,6 +300,7 @@ export function extractFromHtml(html: string): Extracted {
     availabilityText: fromText.availabilityText,
     lat: ld.lat ?? null,
     lng: ld.lng ?? null,
+    furnished: fromText.furnished ?? detectFurnished(`${title}\n${description}`),
   };
 }
 
@@ -311,5 +327,6 @@ export function toRawListing(
     address: extracted.address ?? undefined,
     lat: extracted.lat ?? undefined,
     lng: extracted.lng ?? undefined,
+    furnished: extracted.furnished,
   };
 }

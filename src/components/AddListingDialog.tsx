@@ -31,7 +31,7 @@ const EMPTY_FORM: FormState = {
   charges: '',
   surface: '',
   districtId: 'centre-ville',
-  furnished: false,
+  furnished: true,
   availableFrom: '',
   description: '',
 };

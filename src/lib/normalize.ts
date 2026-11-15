@@ -60,6 +60,24 @@ export function parseSurface(text: string): number | null {
   return value >= 8 && value <= 400 ? Math.round(value * 10) / 10 : null;
 }
 
+/**
+ * Meublé ? true si l'annonce le dit clairement, false si elle dit « non meublé » ou « vide »,
+ * null sinon. « Meuble » seul n'est pas retenu : c'est aussi le nom commun (meubles de cuisine).
+ */
+export function detectFurnished(text: string): boolean | null {
+  const raw = text.toLowerCase();
+  const t = normalizeText(text);
+  if (/non[\s-]*meubl|pas meubl|location vide|logement vide|appartement vide|studio vide|\bloue vide\b|location nue|\bnon equipe et non meuble/.test(t)) {
+    return false;
+  }
+  if (/\bmeublé(e|s|es)?\b/.test(raw)) return true;
+  if (/\b(location|studio|appartement|logement|t1|t1 bis|t2|f1|f2|bien|loue|propose|entierement|tout|totalement|equipe et|refait et)\s+(entierement\s+|tout\s+|totalement\s+)?meublee?s?\b/.test(t)) {
+    return true;
+  }
+  if (/\bmeublee?s?\s*:\s*oui\b|\blmnp\b|bail (de location )?meuble|\bloyer meuble/.test(t)) return true;
+  return null;
+}
+
 /** Colocation, chambre chez l'habitant, logement « à partager ». */
 export function detectShared(text: string): boolean {
   const t = normalizeText(text)
@@ -199,9 +217,9 @@ export function normalizeListing(raw: RawListing, today: string): Listing | null
     }
   }
 
-  const normalized = normalizeText(fullText);
-  const furnished =
-    raw.furnished ?? (/\bmeuble/.test(normalized) && !/non meuble/.test(normalized));
+  // Une mention explicite dans le texte (« non meublé ») l'emporte sur un drapeau positif.
+  const fromText = detectFurnished(fullText);
+  const furnished = fromText === false ? false : (raw.furnished ?? fromText);
 
   return {
     // L'adresse complète de l'annonce l'identifie de façon unique, même quand deux

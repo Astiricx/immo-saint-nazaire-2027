@@ -8,6 +8,7 @@ const REASONS: { code: RejectionCode; label: string }[] = [
   { code: 'colocation', label: 'Colocation' },
   { code: 'budget', label: 'Hors budget' },
   { code: 'type', label: 'Type de bien' },
+  { code: 'meuble', label: 'Non meublé' },
   { code: 'distance', label: 'Trop loin à vélo' },
   { code: 'ville', label: 'Hors Saint-Nazaire' },
 ];

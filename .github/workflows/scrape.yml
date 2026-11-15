@@ -20,7 +20,8 @@ jobs:
   collect:
     name: Collecte et filtrage
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Les Actors Apify collectent tout, sans limite : prévoir large.
+    timeout-minutes: 90
     permissions:
       contents: write
     steps:
@@ -38,7 +39,6 @@ jobs:
         env:
           # Grands portails (Leboncoin, SeLoger, Bien'ici) via Apify : les deux secrets sont nécessaires.
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-          APIFY_MAX_ITEMS: ${{ vars.APIFY_MAX_ITEMS }}
           # Phrase secrète : les annonces sont publiées chiffrées et les journaux restent muets.
           LISTINGS_PASSPHRASE: ${{ secrets.LISTINGS_PASSPHRASE }}
           # Facultatif : alertes e-mail des portails (voir le README).

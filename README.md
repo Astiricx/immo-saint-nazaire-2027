@@ -11,6 +11,7 @@ Site : <https://astiricx.github.io/immo-saint-nazaire-2027/>
 | Critère | Règle |
 | --- | --- |
 | Type de bien | Studio ou T2. Un T1 est assimilé à un studio. Colocations, chambres, T3 et plus, maisons, parkings écartés. |
+| Meublé | **Impératif.** Toute annonce qui n'est pas clairement meublée est écartée : « non meublé » ou « vide », mais aussi une annonce muette sur ce point. |
 | Loyer | 550 € charges comprises visés, 700 € maximum. Au-delà, l'annonce est écartée. |
 | Commune | Saint-Nazaire (44600) uniquement. |
 | Trajet | 20 minutes à vélo au maximum jusqu'aux Chantiers, quand l'annonce permet de situer le logement. |
@@ -38,9 +39,9 @@ Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion
 3. **Jeton.** Ajoutez le secret `APIFY_TOKEN` de la même façon.
 4. Lancez la collecte : *Actions > Collecte quotidienne des annonces > Run workflow*.
 
-Chaque portail renvoie au plus 60 annonces par jour (variable `APIFY_MAX_ITEMS` pour changer). Les Actors sont payés au résultat, autour d'un dollar pour mille annonces, plus le trafic des proxys résidentiels ; le crédit gratuit mensuel d'Apify couvre normalement ce volume. Votre consommation est visible dans la console Apify, qui bloque au lieu de facturer quand le crédit gratuit est épuisé.
+Aucune limite de volume : chaque portail renvoie toutes les annonces de la recherche (Saint-Nazaire, meublé quand le portail le permet, 1 ou 2 pièces, 700 € maximum). Les Actors sont payés au résultat, de un à quelques dollars pour mille annonces, plus le trafic des proxys résidentiels. Votre consommation est visible dans la console Apify.
 
-Les Actors utilisés sont listés dans [`scripts/sources/apify.ts`](scripts/sources/apify.ts) : si l'un d'eux disparaît ou se dégrade, remplacez son `actorId` et son `input`. La conversion des résultats accepte les noms de champs courants.
+Chaque portail a plusieurs Actors candidats, listés dans [`scripts/sources/apify.ts`](scripts/sources/apify.ts) et essayés dans l'ordre : le premier qui renvoie des annonces exploitables est retenu, et le bilan de la collecte indique lequel. Ces Actors sont publiés par des tiers et peuvent disparaître : ajoutez-en un à la liste (`actorId` et `input`) si besoin. La conversion des résultats accepte les noms de champs courants.
 
 ### Pourquoi les annonces sont chiffrées
 

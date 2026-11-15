@@ -39,8 +39,8 @@ export function Brief({
               >
                 {rejected} annonce{rejected > 1 ? 's' : ''} écartée{rejected > 1 ? 's' : ''}
               </a>{' '}
-              automatiquement (colocations, loyers au-dessus de {euro(CRITERIA.maxRent)}, biens trop
-              grands ou trop loin).
+              automatiquement (non meublés, colocations, loyers au-dessus de{' '}
+              {euro(CRITERIA.maxRent)}, biens trop grands ou trop loin).
             </>
           ) : (
             <>
@@ -55,7 +55,7 @@ export function Brief({
         <dl className="divide-y divide-line border-y border-line text-sm">
           <div className="flex justify-between gap-4 py-2">
             <dt className="text-muted">Bien</dt>
-            <dd className="text-right font-medium">Studio ou T2, sans colocation</dd>
+            <dd className="text-right font-medium">Studio ou T2 meublé, sans colocation</dd>
           </div>
           <div className="flex justify-between gap-4 py-2">
             <dt className="text-muted">Trajet</dt>

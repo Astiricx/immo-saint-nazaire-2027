@@ -142,6 +142,16 @@ function collectRejections(
       detail: `${typeLabel(listing.type)} : seuls les studios et les T2 sont retenus`,
     });
   }
+  if (criteria.requireFurnished && listing.furnished !== true && listing.type !== 'chambre' && !listing.isShared) {
+    rejections.push({
+      code: 'meuble',
+      label: 'Non meublé',
+      detail:
+        listing.furnished === false
+          ? 'Logement vide : seuls les meublés sont retenus'
+          : 'Meublé non précisé dans l’annonce : seuls les meublés sont retenus',
+    });
+  }
   if (cost > criteria.maxRent) {
     rejections.push({
       code: 'budget',

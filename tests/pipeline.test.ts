@@ -38,7 +38,7 @@ function listing(overrides: Partial<Listing> = {}): Listing {
     chargesIncluded: true,
     charges: null,
     surface: 38,
-    furnished: false,
+    furnished: true,
     city: 'Saint-Nazaire',
     postcode: '44600',
     districtId: centre.id,
@@ -312,7 +312,7 @@ test('identifiants : deux annonces d’un même site ne se confondent jamais', (
   const marc = normalizeListing(raw({ title: 'Appartement 2 pièces 36m² ST MARC SUR MER 44600', locationText: extractFromText('ST MARC SUR MER 44600').locationText }), TODAY)!;
   assert.equal(marc.postcode, '44600');
   assert.equal(marc.districtId, 'saint-marc');
-  assert.deepEqual(evaluate(marc).rejections.map((r) => r.code), ['distance']);
+  assert.deepEqual(evaluate({ ...marc, furnished: true }).rejections.map((r) => r.code), ['distance']);
 });
 
 test('géocodage : la rue trouvée doit correspondre à la rue demandée', async () => {
@@ -361,7 +361,7 @@ test('Apify : résultat Leboncoin converti', async () => {
   const listing = normalizeListing(raw, TODAY)!;
   assert.equal(listing.type, 'T2');
   assert.equal(listing.postcode, '44600');
-  assert.equal(evaluate(listing).accepted, true);
+  assert.deepEqual(evaluate(listing).rejections.map((r) => r.code), ['meuble'], 'non meublé écarté');
 });
 
 test('Apify : résultat Bien’ici converti, lien étranger refusé', async () => {
@@ -389,4 +389,46 @@ test('Apify : résultat Bien’ici converti, lien étranger refusé', async () =
   assert.equal(listing.districtId, 'front-de-mer');
   assert.equal(toRawListing({ ...item, url: 'https://ailleurs.example/annonce/1' }, portal), null);
   assert.equal(toRawListing({ ...item, price: null }, portal), null);
+});
+
+test('meublé : détection stricte et rejet de tout ce qui n’est pas clairement meublé', async () => {
+  const { detectFurnished } = await import('../src/lib/normalize');
+  assert.equal(detectFurnished('Studio meublé proche gare'), true);
+  assert.equal(detectFurnished('T2 entierement meuble et equipe'), true);
+  assert.equal(detectFurnished('Location meublée, bail 1 an'), true);
+  assert.equal(detectFurnished('Appartement non meublé'), false);
+  assert.equal(detectFurnished('T2 loué vide, cuisine équipée'), false);
+  assert.equal(detectFurnished('Cuisine avec meubles hauts et bas'), null);
+  assert.equal(detectFurnished('Bel immeuble ancien'), null);
+  assert.equal(detectFurnished('T2 lumineux'), null);
+
+  const codes = (l: Listing) => evaluate(l).rejections.map((r) => r.code);
+  assert.deepEqual(codes(listing({ furnished: true })), []);
+  assert.deepEqual(codes(listing({ furnished: false })), ['meuble']);
+  assert.deepEqual(codes(listing({ furnished: null })), ['meuble']);
+  // « Non meublé » dans le texte l'emporte sur un drapeau positif.
+  const contradicted = normalizeListing(raw({ description: 'Appartement non meublé', furnished: true }), TODAY)!;
+  assert.equal(contradicted.furnished, false);
+});
+
+test('meublé : champ légal d’une fiche d’agence et filtre du portail', async () => {
+  const { findFurnished } = await import('../scripts/lib/extract');
+  assert.equal(findFurnished('Typologie\nT1\nMeublé\nOui\nLoyer\n450'), true);
+  assert.equal(findFurnished('Meublé : Non'), false);
+  const { toRawListing, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const portal = APIFY_PORTALS.find((p) => p.id === 'bienici')!;
+  const item = { url: 'https://www.bienici.com/annonce/x', title: 'Appartement', price: 520, surfaceArea: 30, roomsQuantity: 1, city: 'Saint-Nazaire', postalCode: '44600' };
+  assert.equal(toRawListing(item, portal, true)!.furnished, true, 'recherche filtrée sur meublé');
+  assert.equal(toRawListing(item, portal, false)!.furnished, null);
+  assert.equal(toRawListing({ ...item, isFurnished: false }, portal, true)!.furnished, false, 'drapeau contraire prioritaire');
+});
+
+test('Leboncoin : l’URL de recherche porte tous les critères', async () => {
+  const { LEBONCOIN_SEARCH_URL, APIFY_PORTALS } = await import('../scripts/sources/apify');
+  const url = new URL(LEBONCOIN_SEARCH_URL);
+  assert.equal(url.searchParams.get('category'), '10');
+  assert.equal(url.searchParams.get('furnished'), '1');
+  assert.equal(url.searchParams.get('price'), 'min-700');
+  assert.equal(url.searchParams.get('locations'), 'Saint-Nazaire_44600');
+  for (const portal of APIFY_PORTALS) assert.ok(portal.actors.length >= 1, portal.id);
 });

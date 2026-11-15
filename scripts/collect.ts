@@ -47,6 +47,7 @@ const SOURCES: ListingSource[] = [
 const REASON_LABELS: Record<RejectionCode, string> = {
   colocation: 'colocation',
   type: 'type de bien',
+  meuble: 'non meublé',
   budget: 'hors budget',
   distance: 'trop loin à vélo',
   ville: 'hors Saint-Nazaire',
@@ -165,7 +166,9 @@ async function main() {
   }));
   const keptIds = new Set(keptListings.map((l) => l.id));
   for (const old of previous?.listings ?? []) {
-    if (failedSources.has(old.collector ?? old.source) && !keptIds.has(old.id)) keptListings.push(old);
+    if (failedSources.has(old.collector ?? old.source) && !keptIds.has(old.id) && evaluate(old).accepted) {
+      keptListings.push(old);
+    }
   }
   for (const report of reports) {
     report.kept = keptListings.filter((l) => (l.collector ?? l.source) === report.id).length;

@@ -8,7 +8,7 @@ export type LocationPrecision = 'adresse' | 'quartier' | 'inconnue';
 
 export type BudgetTier = 'ideal' | 'correct' | 'dernier-recours' | 'hors-budget';
 
-export type RejectionCode = 'colocation' | 'type' | 'budget' | 'distance' | 'ville';
+export type RejectionCode = 'colocation' | 'type' | 'meuble' | 'budget' | 'distance' | 'ville';
 
 export type StatusId =
   | 'a-analyser'
@@ -40,7 +40,8 @@ export interface RawListing {
   address?: string;
   lat?: number;
   lng?: number;
-  furnished?: boolean;
+  /** true meublé, false vide, null ou absent : non précisé. */
+  furnished?: boolean | null;
 }
 
 /** Annonce normalisée : c'est ce format qui est publié dans public/listings.json. */
@@ -63,7 +64,8 @@ export interface Listing {
   /** Provision pour charges quand elle est annoncée à part. */
   charges: number | null;
   surface: number;
-  furnished: boolean;
+  /** true meublé, false vide, null non précisé dans l'annonce. */
+  furnished: boolean | null;
   city: string;
   postcode: string | null;
   districtId: string | null;

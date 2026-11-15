@@ -10,6 +10,9 @@ export const CRITERIA = {
   /** Studio ou T2 uniquement. Un T1 (studio avec cuisine séparée) est assimilé à un studio. */
   allowedTypes: ['studio', 'T1', 'T2'] as PropertyType[],
 
+  /** Impératif : seules les annonces clairement identifiées comme meublées sont retenues. */
+  requireFurnished: true,
+
   /** Loyer charges comprises visé. */
   idealRent: 550,
   /** Seuil intermédiaire : au-delà, on entre dans le « dernier recours ». */

@@ -104,7 +104,7 @@ export function agencySource(site: AgencySite): ListingSource {
       if (detailUrls.size === 0 && lastError) throw lastError;
 
       const listings: RawListing[] = [];
-      const max = site.maxDetails ?? 40;
+      const max = site.maxDetails ?? 200;
       let unreadable = 0;
       let notAllowed = 0;
       let fromCards = 0;
