@@ -53,17 +53,18 @@ const FR_RESIDENTIAL = {
 export const LEBONCOIN_SEARCH_URL =
   `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_44600&real_estate_type=2&furnished=1&rooms=1-2&price=min-${CRITERIA.maxRent}`;
 
+/**
+ * Recherche SeLoger : locations d'appartements à Saint-Nazaire. SeLoger désigne les villes par un
+ * identifiant interne non public ; cette adresse « classique » est acceptée par les Actors.
+ */
+export const SELOGER_SEARCH_URL = 'https://www.seloger.com/immobilier/locations/immo-saint-nazaire-44/bien-appartement/';
+
 export const APIFY_PORTALS: ApifyPortal[] = [
   {
     id: 'leboncoin',
     label: 'Leboncoin',
     domain: 'leboncoin.fr',
     actors: [
-      {
-        actorId: 'crawloop/leboncoin-scraper',
-        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
-        furnishedFilter: true,
-      },
       {
         actorId: 'data_alchemist/leboncoin',
         input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxResults: 1000, proxyConfiguration: FR_RESIDENTIAL },
@@ -87,6 +88,11 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         },
         furnishedFilter: false,
       },
+      {
+        actorId: 'crawloop/leboncoin-scraper',
+        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
+        furnishedFilter: true,
+      },
     ],
   },
   {
@@ -97,9 +103,7 @@ export const APIFY_PORTALS: ApifyPortal[] = [
       {
         actorId: 'crawloop/seloger-scraper',
         input: {
-          location: CITY,
-          transactionType: 'rent',
-          propertyType: 'apartment',
+          startUrls: [{ url: SELOGER_SEARCH_URL }],
           maxPrice: CRITERIA.maxRent,
           maxRooms: 2,
           maxItems: NO_LIMIT,
@@ -107,6 +111,11 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           includeDetails: true,
           proxyConfiguration: FR_RESIDENTIAL,
         },
+        furnishedFilter: false,
+      },
+      {
+        actorId: 'automation-lab/seloger-property-listings-scraper',
+        input: { startUrls: [{ url: SELOGER_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: false,
       },
       {
