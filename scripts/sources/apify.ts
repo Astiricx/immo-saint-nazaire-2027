@@ -215,7 +215,10 @@ export const APIFY_PORTALS: ApifyPortal[] = [
         actorId: 'tagadanar/french-real-estate-paruvendu',
         input: [
           {
-            searchUrls: [PARUVENDU_CATEGORY_URLS[0]],
+            searchUrls: [
+              'https://www.paruvendu.fr/immobilier/recherche/location/appartement/meuble/saint-nazaire-44600/',
+              PARUVENDU_CATEGORY_URLS[0],
+            ],
             scrapeDetails: true,
             maxResults: 1000,
             maxPagesPerUrl: 20,
@@ -766,6 +769,11 @@ export function apifySource(portal: ApifyPortal): ListingSource {
           console.log(`  champs présents : ${fieldCoverage(items)}`);
           console.log(`  champs « meublé » : ${furnishedPaths(items)}`);
           console.log(`  meublé lu dans les données : ${states.oui} oui, ${states.non} non, ${states.inconnu} non précisé`);
+          const lengths = listings.map((l) => l.description.length).sort((a, b) => a - b);
+          const mentions = listings.filter((l) => /meubl/i.test(`${l.title} ${l.description}`)).length;
+          console.log(
+            `  textes : description médiane ${lengths[Math.floor(lengths.length / 2)] ?? 0} caractères, « meubl… » dans ${mentions} annonce(s)`,
+          );
         }
         if (listings.length === 0) {
           failures.push(`${actor.actorId} : ${items.length} résultat(s), aucun exploitable`);
