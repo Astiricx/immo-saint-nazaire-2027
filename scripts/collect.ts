@@ -132,8 +132,10 @@ async function main() {
   const collected: Listing[] = [];
   let unreadable = 0;
 
+  // Collecte partielle (ONLY_SOURCES=pap,logicimmo) : les autres sources gardent leurs annonces.
+  const only = (process.env.ONLY_SOURCES ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   for (const source of SOURCES) {
-    const disabled = source.disabledReason();
+    const disabled = only.length && !only.includes(source.id) ? 'non lancée lors de cette collecte partielle' : source.disabledReason();
     if (disabled) {
       reports.push({ id: source.id, label: source.label, status: 'inactive', found: 0, kept: 0, message: disabled });
       console.log(`– ${source.label} : inactive (${disabled})`);
@@ -204,11 +206,15 @@ async function main() {
   }
   const rejectedCounts: Partial<Record<RejectionCode, number>> = {};
   /** Motifs d'exclusion par source : des comptes seulement, jamais le contenu des annonces. */
-  const bySource = new Map<string, { read: number; kept: number; reasons: Partial<Record<RejectionCode, number>> }>();
+  const bySource = new Map<
+    string,
+    { read: number; kept: number; reasons: Partial<Record<RejectionCode, number>>; furnished: [number, number, number] }
+  >();
   for (const listing of evaluated) {
     const key = listing.collector ?? listing.source;
-    const entry = bySource.get(key) ?? { read: 0, kept: 0, reasons: {} };
+    const entry = bySource.get(key) ?? { read: 0, kept: 0, reasons: {}, furnished: [0, 0, 0] };
     entry.read += 1;
+    entry.furnished[listing.furnished === true ? 0 : listing.furnished === false ? 1 : 2] += 1;
     if (listing.accepted) entry.kept += 1;
     for (const rejection of listing.rejections) {
       entry.reasons[rejection.code] = (entry.reasons[rejection.code] ?? 0) + 1;
@@ -222,7 +228,10 @@ async function main() {
       .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
       .map(([code, n]) => `${n} ${REASON_LABELS[code as RejectionCode]}`)
       .join(', ');
-    return `${label} : ${e.kept} retenue(s) sur ${e.read}${reasons ? ` — motifs : ${reasons}` : ''}`;
+    const [yes, no, unknown] = e.furnished;
+    return `${label} : ${e.kept} retenue(s) sur ${e.read} (meublé : ${yes} oui, ${no} non, ${unknown} non précisé)${
+      reasons ? ` — motifs : ${reasons}` : ''
+    }`;
   });
   console.log(`\nPar source (une annonce peut cumuler plusieurs motifs) :\n${breakdown.map((l) => `  ${l}`).join('\n')}`);
 
@@ -231,7 +240,8 @@ async function main() {
   // « plus revues ») tant qu'elles ont été vues dans les RETENTION_DAYS derniers jours.
   const byId = new Map(unique.map((l) => [l.id, l]));
   const freshAccepted: Listing[] = accepted.map(({ id }) => byId.get(id) as Listing);
-  const merge = mergeWithHistory(freshAccepted, history, today);
+  const unverified = new Set(reports.filter((r) => r.status !== 'ok').map((r) => r.id));
+  const merge = mergeWithHistory(freshAccepted, history, today, RETENTION_DAYS, unverified);
   const keptListings = merge.listings;
   for (const report of reports) {
     report.kept = keptListings.filter((l) => (l.collector ?? l.source) === report.id).length;

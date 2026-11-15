@@ -58,6 +58,8 @@ export function mergeWithHistory(
   history: HistoryEntry[],
   today: string,
   retentionDays = RETENTION_DAYS,
+  /** Sources non lues avec succès aujourd'hui : on ne peut pas dire si leurs annonces sont encore en ligne. */
+  unverifiedSources: ReadonlySet<string> = new Set(),
 ): MergeResult {
   // Mémoire de l'historique par identifiant et par lien : première et dernière apparition.
   const known = new Map<string, { listing: Listing; firstSeen: string; lastSeen: string }>();
@@ -85,11 +87,12 @@ export function mergeWithHistory(
   let expired = 0;
   for (const record of new Set(known.values())) {
     if (keysOf(record.listing).some((k) => freshKeys.has(k))) continue;
+    const unverified = unverifiedSources.has(record.listing.collector ?? record.listing.source);
     const listing: Listing = {
       ...record.listing,
       firstSeen: record.firstSeen,
       lastSeen: record.lastSeen,
-      stillListed: false,
+      stillListed: unverified ? (record.listing.stillListed ?? true) : false,
     };
     if (daysBetween(record.lastSeen, today) > retentionDays || !evaluate(listing).accepted) {
       expired += 1;
@@ -103,8 +106,8 @@ export function mergeWithHistory(
   const kept = new Set(unique);
   return {
     listings: unique,
-    fresh: merged.filter((l) => l.stillListed && kept.has(l)).length,
-    carried: merged.filter((l) => !l.stillListed && kept.has(l)).length,
+    fresh: unique.filter((l) => l.lastSeen === today).length,
+    carried: unique.filter((l) => l.lastSeen !== today).length,
     expired,
     duplicates: removed,
   };

@@ -624,3 +624,11 @@ test('historique : les annonces s’accumulent d’une collecte à l’autre, sa
   const next = mergeWithHistory([], result.listings.map((l) => ({ listing: l, collectedOn: '2026-11-15' })), '2026-11-16');
   assert.equal(next.listings.length, 3);
 });
+
+test('historique : une source en panne ne marque pas ses annonces « plus revues »', async () => {
+  const { mergeWithHistory } = await import('../src/lib/history');
+  const a = listing({ id: 'lbc-a', source: 'leboncoin', collector: 'leboncoin', url: 'https://www.leboncoin.fr/ad/locations/9', stillListed: true, lastSeen: '2026-11-14' });
+  const history = [{ listing: a, collectedOn: '2026-11-14' }];
+  assert.equal(mergeWithHistory([], history, '2026-11-15', 30, new Set(['leboncoin'])).listings[0].stillListed, true);
+  assert.equal(mergeWithHistory([], history, '2026-11-15').listings[0].stillListed, false);
+});

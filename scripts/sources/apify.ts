@@ -41,8 +41,8 @@ export interface ApifyPortal {
 
 const CITY = 'Saint-Nazaire';
 const POSTCODE = '44600';
-/** Plafond technique très au-dessus du nombre d'annonces possibles : aucune annonce n'est écartée faute de place. */
-const NO_LIMIT = 10000;
+// Volumes : chaque Actor reçoit son maximum accepté (1000 en général), très au-dessus du nombre
+// d'annonces de Saint-Nazaire : aucune annonce n'est écartée faute de place.
 const FR_RESIDENTIAL = {
   useApifyProxy: true,
   apifyProxyGroups: ['RESIDENTIAL'],
@@ -67,16 +67,18 @@ const AVIV_LOCATION = 'AD08FR17295';
 export const LEBONCOIN_SEARCH_URL =
   `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_${POSTCODE}&real_estate_type=1,2&furnished=1&square=${CRITERIA.minSurface}-max&price=min-${SEARCH_MAX_RENT}`;
 
-export const SELOGER_SEARCH_URL =
-  `https://www.seloger.com/classified-search?distributionTypes=Rent&estateTypes=House,Apartment&locations=${AVIV_LOCATION}&priceMax=${SEARCH_MAX_RENT}&spaceMin=${CRITERIA.minSurface}`;
-
 export const LOGICIMMO_SEARCH_URL =
   `https://www.logic-immo.com/classified-search?distributionTypes=Rent&estateTypes=House,Apartment&locations=${AVIV_LOCATION}&priceMax=${SEARCH_MAX_RENT}&spaceMin=${CRITERIA.minSurface}`;
 
 /** Toutes les locations PAP à Saint-Nazaire (le code g24084 est celui de la commune sur pap.fr). */
 export const PAP_SEARCH_URL = 'https://www.pap.fr/annonce/locations-saint-nazaire-44600-g24084';
 
+/** Pages de résultats ParuVendu, sous deux formes d'adresse : la seconde sert si la première ne donne rien. */
 export const PARUVENDU_SEARCH_URLS = [
+  'https://www.paruvendu.fr/immobilier/recherche/location/saint-nazaire-44600/',
+  'https://www.paruvendu.fr/immobilier/recherche/location/appartement/saint-nazaire-44600/',
+];
+export const PARUVENDU_CATEGORY_URLS = [
   'https://www.paruvendu.fr/immobilier/location/appartement/meuble/saint-nazaire-44600/',
   'https://www.paruvendu.fr/immobilier/location/appartement/saint-nazaire-44600/',
   'https://www.paruvendu.fr/immobilier/location/maison/saint-nazaire-44600/',
@@ -93,7 +95,8 @@ const pigeImmo = (source: string, proxy: Record<string, unknown>): ApifyActor =>
     propertyTypes: ['appartement', 'maison'],
     priceMax: SEARCH_MAX_RENT,
     surfaceMin: CRITERIA.minSurface,
-    maxResultsPerSource: NO_LIMIT,
+    // Maximum accepté par l'Actor : 5000 ; la recherche en compte bien moins.
+    maxResultsPerSource: 1000,
     enrichDpe: false,
     dedupAcrossSources: false,
     proxyConfig: proxy,
@@ -115,14 +118,14 @@ export const APIFY_PORTALS: ApifyPortal[] = [
       },
       {
         actorId: 'crawlerbros/leboncoin-scraper',
-        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
+        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: 1000, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: true,
       },
       // xtracto/leboncoin-listings a été retiré : sa recherche par code postal ramenait des centaines
       // d'annonces hors Saint-Nazaire et non meublées, et a épuisé le crédit Apify mensuel en une exécution.
       {
         actorId: 'crawloop/leboncoin-scraper',
-        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: NO_LIMIT, proxyConfiguration: FR_RESIDENTIAL },
+        input: { startUrls: [{ url: LEBONCOIN_SEARCH_URL }], maxItems: 1000, proxyConfiguration: FR_RESIDENTIAL },
         furnishedFilter: true,
       },
     ],
@@ -133,14 +136,9 @@ export const APIFY_PORTALS: ApifyPortal[] = [
     domain: 'seloger.com',
     actors: [
       {
-        // Recherche filtrée (maisons et appartements, loyer, surface) : moins de résultats inutiles.
-        // Sur l'offre gratuite d'Apify, cet Actor plafonne à 200 annonces par exécution.
-        actorId: 'lentic_clockss/seloger-property-scraper',
-        input: { startUrls: [{ url: SELOGER_SEARCH_URL }], channel: 'RENT', maxItems: 500, maxPages: 50, scrapeDetails: true },
-        furnishedFilter: false,
-      },
-      {
-        // Même Actor, recherche par ville : appartements puis maisons.
+        // Recherche par ville, appartements puis maisons. L'Actor n'accepte pas les URL de recherche
+        // filtrées (loyer, surface) : le filtrage se fait ensuite. Le portail ne publie pas de champ
+        // « meublé » : il est lu dans le texte et les caractéristiques de l'annonce.
         actorId: 'lentic_clockss/seloger-property-scraper',
         input: ['appartement', 'maison'].map((propertyType) => ({
           location: 'saint-nazaire',
@@ -180,7 +178,7 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           propertyTypes: ['apartment', 'house'],
           priceMax: SEARCH_MAX_RENT,
           surfaceMin: CRITERIA.minSurface,
-          maxResults: NO_LIMIT,
+          maxResults: 1000,
           proxyConfiguration: FR_RESIDENTIAL,
         },
         furnishedFilter: false,
@@ -221,7 +219,7 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           minSurface: CRITERIA.minSurface,
           // Fiche complète : description entière (« meublé ») et rue.
           scrapeDetails: true,
-          maxResults: 4000,
+          maxResults: 1000,
           maxPagesPerUrl: 20,
         },
         furnishedFilter: false,
@@ -241,24 +239,14 @@ export const APIFY_PORTALS: ApifyPortal[] = [
           searchUrls: [LOGICIMMO_SEARCH_URL],
           maxPrice: SEARCH_MAX_RENT,
           minSurface: CRITERIA.minSurface,
-          maxResults: 4000,
+          // Maximum accepté par l'Actor : 1050.
+          maxResults: 1000,
           maxPagesPerUrl: 40,
         },
         furnishedFilter: false,
       },
+      // studio-amba/logicimmo-scraper a été retiré : Actor en location, refusé avec le crédit gratuit.
       pigeImmo('logic_immo', FR_RESIDENTIAL),
-      {
-        actorId: 'studio-amba/logicimmo-scraper',
-        input: {
-          searchUrl: LOGICIMMO_SEARCH_URL,
-          listingType: 'rent',
-          searchQuery: 'saint-nazaire',
-          maxResults: NO_LIMIT,
-          scrapeDetails: true,
-          proxyConfiguration: FR_RESIDENTIAL,
-        },
-        furnishedFilter: false,
-      },
     ],
   },
   {
@@ -269,14 +257,12 @@ export const APIFY_PORTALS: ApifyPortal[] = [
       {
         // Payé à l'annonce, proxys compris. La première recherche ne contient que des meublés.
         actorId: 'tagadanar/french-real-estate-paruvendu',
-        input: {
-          searchUrls: PARUVENDU_SEARCH_URLS,
-          maxPrice: SEARCH_MAX_RENT,
-          minSurface: CRITERIA.minSurface,
-          scrapeDetails: true,
-          maxResults: 4000,
-          maxPagesPerUrl: 20,
-        },
+        input: { searchUrls: PARUVENDU_SEARCH_URLS, scrapeDetails: true, maxResults: 1000, maxPagesPerUrl: 20 },
+        furnishedFilter: false,
+      },
+      {
+        actorId: 'tagadanar/french-real-estate-paruvendu',
+        input: { searchUrls: PARUVENDU_CATEGORY_URLS, scrapeDetails: true, maxResults: 1000, maxPagesPerUrl: 20 },
         furnishedFilter: false,
       },
     ],
@@ -434,8 +420,10 @@ function featureLabels(item: Item): string[] {
     } else if (Array.isArray(value)) {
       value.forEach((v) => visit(v, depth + 1));
     } else if (isObject(value)) {
+      // { label: 'Meublé', value: false } : caractéristique absente, à ne pas reprendre comme texte.
+      const absent = value.value === false || value.enabled === false || /^(non|no|false)$/i.test(toText(value.value));
       const text = toText(value.label ?? value.name ?? value.title ?? value.value);
-      if (text && text.length <= 40) labels.add(text);
+      if (text && text.length <= 40 && !absent) labels.add(text);
       // Objet de booléens : { balcony: true, furnished: false } → on garde les clés vraies.
       for (const [key, v] of Object.entries(value)) if (v === true) labels.add(key);
     }
@@ -591,6 +579,22 @@ export class CreditExhaustedError extends Error {
   }
 }
 
+/** Consommation du mois sur le compte Apify, en dollars : { used, limit }, si l'API la donne. */
+export async function apifyUsage(): Promise<{ used: number; limit: number } | null> {
+  try {
+    const response = await apify('/users/me/limits');
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      data?: { current?: { monthlyUsageUsd?: number }; limits?: { maxMonthlyUsageUsd?: number } };
+    };
+    const used = body.data?.current?.monthlyUsageUsd;
+    const limit = body.data?.limits?.maxMonthlyUsageUsd;
+    return used != null && limit != null ? { used, limit } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Date de renouvellement du crédit mensuel Apify, au format jj/mm/aaaa, si l'API la donne. */
 async function creditRenewal(): Promise<string | undefined> {
   try {
@@ -696,6 +700,7 @@ export function apifySource(portal: ApifyPortal): ListingSource {
     },
     async fetch(debug) {
       const failures: string[] = [];
+      const before = await apifyUsage();
       for (const actor of portal.actors) {
         const items: Item[] = [];
         let lastError: string | null = null;
@@ -728,6 +733,12 @@ export function apifySource(portal: ApifyPortal): ListingSource {
           continue;
         }
         const skipped = items.length - listings.length;
+        const after = await apifyUsage();
+        if (before && after) {
+          console.log(
+            `  crédit Apify : ${(after.used - before.used).toFixed(2)} $ pour ce portail, ${after.used.toFixed(2)} $ consommés sur ${after.limit.toFixed(2)} $ ce mois`,
+          );
+        }
         return {
           listings,
           message: `Actor ${actor.actorId} : ${items.length} résultat(s)${

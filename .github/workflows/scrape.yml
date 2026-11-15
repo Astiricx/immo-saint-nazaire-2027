@@ -15,6 +15,10 @@ on:
         description: Reprendre les annonces de toutes les collectes passées (historique git)
         type: boolean
         default: false
+      sources:
+        description: "Collecte partielle : identifiants des sources, séparés par des virgules (vide = toutes)"
+        type: string
+        default: ''
 
 concurrency:
   group: collecte
@@ -57,6 +61,7 @@ jobs:
           FEED_URLS: ${{ vars.FEED_URLS }}
           COLLECT_DEBUG: ${{ inputs.debug && '1' || '' }}
           RECOVER_HISTORY: ${{ inputs.recover && '1' || '' }}
+          ONLY_SOURCES: ${{ inputs.sources }}
 
       - name: Enregistrer les annonces dans le dépôt
         run: |
