@@ -31,8 +31,7 @@ export function Brief({
           {data?.generatedAt ? (
             <>
               {accepted} annonce{accepted > 1 ? 's' : ''} retenue{accepted > 1 ? 's' : ''}, dont{' '}
-              {idealCount} à {euro(CRITERIA.idealNetRent)} net ou moins, aide au logement estimée
-              déduite. Dernière collecte le{' '}
+              {idealCount} à {euro(CRITERIA.idealRent)} charges comprises ou moins. Dernière collecte le{' '}
               {formatDateTime(data.generatedAt)} sur {activeSources} source
               {activeSources > 1 ? 's' : ''} ;{' '}
               <a
@@ -42,7 +41,7 @@ export function Brief({
                 {rejected} annonce{rejected > 1 ? 's' : ''} écartée{rejected > 1 ? 's' : ''}
               </a>{' '}
               automatiquement (non meublés, moins de {CRITERIA.minSurface} m², colocations, plus de{' '}
-              {euro(CRITERIA.maxNetRent)} net après aide, ou plus de {CRITERIA.maxBikeMinutes} min à
+              {euro(CRITERIA.maxRent)} charges comprises, ou plus de {CRITERIA.maxBikeMinutes} min à
               vélo).
             </>
           ) : (
@@ -59,7 +58,8 @@ export function Brief({
           <div className="flex justify-between gap-4 py-2">
             <dt className="text-muted">Bien</dt>
             <dd className="text-right font-medium">
-              T2, T3, T4 ou maison meublés, {CRITERIA.minSurface} m² minimum, sans colocation
+              Meublé, {CRITERIA.minSurface} m² minimum, T2 en priorité (studios et grands logements
+              acceptés), sans colocation
             </dd>
           </div>
           <div className="flex justify-between gap-4 py-2">
@@ -78,7 +78,7 @@ export function Brief({
             <div className="flex justify-between gap-4 py-2">
               <dt className="text-muted">Aide au logement</dt>
               <dd className="text-right font-medium">
-                ≈ {euro(estimateApl(CRITERIA.maxNetRent).amount)} par mois, estimée
+                ≈ {euro(estimateApl(CRITERIA.maxRent).amount)} par mois, à titre indicatif
                 <span className="block text-xs font-normal text-muted">{aidProfileLabel()}</span>
               </dd>
             </div>
@@ -89,19 +89,17 @@ export function Brief({
           </div>
           <div className="py-2">
             <div className="flex justify-between gap-4">
-              <dt className="text-muted">Loyer net après aide</dt>
+              <dt className="text-muted">Loyer affiché</dt>
               <dd className="text-right font-medium">
-                {euro(CRITERIA.idealNetRent)} idéal, {euro(CRITERIA.maxNetRent)} maximum
-                <span className="block text-xs font-normal text-muted">
-                  charges comprises, moins l’aide estimée
-                </span>
+                {euro(CRITERIA.idealRent)} idéal, {euro(CRITERIA.maxRent)} maximum
+                <span className="block text-xs font-normal text-muted">charges comprises</span>
               </dd>
             </div>
             <div className="mt-3">
               <LoadLine showScale />
             </div>
             <p className="mt-1 text-xs leading-relaxed text-muted">
-              Chaque annonce porte cette jauge : le repère situe son loyer net entre l’idéal (vert),
+              Chaque annonce porte cette jauge : le repère situe son loyer charges comprises entre l’idéal (vert),
               le dernier recours (ambre) et le hors budget (hachures).
             </p>
           </div>

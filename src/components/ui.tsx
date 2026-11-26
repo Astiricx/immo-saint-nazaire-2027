@@ -132,7 +132,7 @@ export function useOverlay(onClose: () => void) {
   }, [onClose]);
 }
 
-/** Ce qui reste à payer chaque mois après l'aide au logement estimée. */
+/** Ce qui resterait à payer après l'aide au logement estimée : indicatif, hors filtrage. */
 export function NetRent({
   listing,
   size = 'md',
@@ -144,10 +144,10 @@ export function NetRent({
   return (
     <div className="rounded-md bg-accent/10 px-3 py-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">Loyer net estimé après APL</span>
+        <span className="text-sm font-medium">Après APL estimée (indicatif)</span>
         <span
           className={`font-display font-semibold leading-none tabular-nums text-accent ${
-            size === 'lg' ? 'text-4xl' : 'text-3xl'
+            size === 'lg' ? 'text-2xl' : 'text-xl'
           }`}
         >
           {euro(listing.netCost)}

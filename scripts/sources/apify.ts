@@ -1,4 +1,3 @@
-import { estimateApl } from '../../src/lib/apl';
 import { CRITERIA } from '../../src/lib/criteria';
 import type { RawListing } from '../../src/lib/types';
 import { PRIVATE_MODE } from '../lib/privacy';
@@ -56,19 +55,17 @@ const FR_RESIDENTIAL = {
 };
 
 /**
- * Loyer affiché maximal demandé aux portails. Le plafond porte sur le loyer NET
- * (charges comprises − aide au logement estimée) : on cherche donc jusqu'au plafond net
- * plus l'aide maximale, arrondi aux 50 € supérieurs. Le filtrage exact se fait ensuite.
+ * Loyer affiché maximal demandé aux portails : le plafond charges comprises lui-même.
+ * Le filtrage exact (charges estimées quand elles ne sont pas comprises) se fait ensuite.
  */
-export const SEARCH_MAX_RENT =
-  Math.ceil((CRITERIA.maxNetRent + estimateApl(CRITERIA.maxNetRent).amount) / 50) * 50;
+export const SEARCH_MAX_RENT = CRITERIA.maxRent;
 
 /** Identifiant de Saint-Nazaire (44600) sur les portails du groupe SeLoger / Logic-Immo. */
 const AVIV_LOCATION = 'AD08FR17295';
 
 /**
  * Recherche Leboncoin : locations meublées à Saint-Nazaire (44600), maisons et appartements,
- * 25 m² minimum, loyer affiché jusqu'à SEARCH_MAX_RENT. C'est l'URL que le site produit avec ces filtres.
+ * surface minimale des critères, loyer affiché jusqu'à SEARCH_MAX_RENT. C'est l'URL que le site produit avec ces filtres.
  */
 export const LEBONCOIN_SEARCH_URL =
   `https://www.leboncoin.fr/recherche?category=10&locations=Saint-Nazaire_${POSTCODE}&real_estate_type=1,2&furnished=1&square=${CRITERIA.minSurface}-max&price=min-${SEARCH_MAX_RENT}`;

@@ -6,6 +6,7 @@ import type {
   BudgetTier,
   EvaluatedListing,
   Listing,
+  PropertyType,
   Rejection,
   ScorePart,
   Zone,
@@ -27,11 +28,11 @@ export function monthlyCost(
   return { cost: listing.rent + charges, estimated: true, charges };
 }
 
-/** Tranche de budget, sur le loyer net (après aide au logement estimée). */
-export function budgetTier(netCost: number, criteria: Criteria = CRITERIA): BudgetTier {
-  if (netCost <= criteria.idealNetRent) return 'ideal';
-  if (netCost <= criteria.stretchNetRent) return 'correct';
-  if (netCost <= criteria.maxNetRent) return 'dernier-recours';
+/** Tranche de budget, sur le loyer affiché charges comprises. */
+export function budgetTier(cost: number, criteria: Criteria = CRITERIA): BudgetTier {
+  if (cost <= criteria.idealRent) return 'ideal';
+  if (cost <= criteria.stretchRent) return 'correct';
+  if (cost <= criteria.maxRent) return 'dernier-recours';
   return 'hors-budget';
 }
 
@@ -50,16 +51,25 @@ const ZONE_LABELS: Record<Zone, string> = {
 };
 
 /**
- * Note du loyer, sur le loyer net (après aide au logement estimée) :
- * 40 points jusqu'à 200 € sous le budget idéal, 32 au budget idéal, puis dégressif jusqu'à 8 au plafond net.
+ * Note du loyer, sur le loyer affiché charges comprises :
+ * 35 points jusqu'à 200 € sous le budget idéal, 28 au budget idéal, puis dégressif jusqu'à 7 au plafond.
  * Sous le budget idéal, chaque euro économisé compte encore un peu.
  */
-export function priceScore(netCost: number, criteria: Criteria = CRITERIA): number {
-  const floor = criteria.idealNetRent - 200;
-  if (netCost <= floor) return 40;
-  if (netCost <= criteria.idealNetRent) return 40 - ((netCost - floor) / 200) * 8;
-  if (netCost >= criteria.maxNetRent) return 8;
-  return 32 - ((netCost - criteria.idealNetRent) / (criteria.maxNetRent - criteria.idealNetRent)) * 24;
+export function priceScore(cost: number, criteria: Criteria = CRITERIA): number {
+  const floor = criteria.idealRent - 200;
+  if (cost <= floor) return 35;
+  if (cost <= criteria.idealRent) return 35 - ((cost - floor) / 200) * 7;
+  if (cost >= criteria.maxRent) return 7;
+  return 28 - ((cost - criteria.idealRent) / (criteria.maxRent - criteria.idealRent)) * 21;
+}
+
+/** Note du type de bien : le T2 recherché en priorité, puis les grands logements, puis les studios. */
+export function typeScore(type: PropertyType, criteria: Criteria = CRITERIA): number {
+  if (type === criteria.preferredType) return 10;
+  if (type === 'T3+' || type === 'maison') return 7;
+  if (type === 'T1') return 5;
+  if (type === 'studio') return 4;
+  return 0;
 }
 
 /** Loyer hors charges : base du calcul de l'aide au logement. */
@@ -108,30 +118,24 @@ function availabilityScore(
 }
 
 function comfortScore(listing: Listing): { points: number; detail: string } {
-  const surfacePoints = clamp01((listing.surface - 15) / 25) * 6;
+  const surfacePoints = clamp01((listing.surface - 20) / 25) * 3;
   const bonuses: string[] = [];
   let bonus = 0;
   if (listing.chargesIncluded) {
-    bonus += 2;
-    bonuses.push('charges comprises');
-  }
-  if (listing.furnished) {
     bonus += 1;
-    bonuses.push('meublé');
+    bonuses.push('charges comprises');
   }
   if (listing.features.some((f) => /v[ée]lo/i.test(f))) {
     bonus += 1;
     bonuses.push('local vélo');
   }
   const detail = [formatSurface(listing.surface), ...bonuses].join(', ');
-  return { points: Math.min(10, surfacePoints + bonus), detail };
+  return { points: Math.min(5, surfacePoints + bonus), detail };
 }
 
 function collectRejections(
   listing: Listing,
   cost: number,
-  netCost: number,
-  aid: number,
   bikeMinutes: number | null,
   criteria: Criteria,
 ): Rejection[] {
@@ -158,7 +162,7 @@ function collectRejections(
     rejections.push({
       code: 'type',
       label: 'Type de bien',
-      detail: `${typeLabel(listing.type)} : seuls les logements (T2, T3, T4, maisons, studios de ${criteria.minSurface} m² et plus) sont retenus`,
+      detail: `${typeLabel(listing.type)} : seuls les logements (studios, T2, T3, T4, maisons) sont retenus`,
     });
   }
   if (listing.surface < criteria.minSurface) {
@@ -178,11 +182,11 @@ function collectRejections(
           : 'Meublé non précisé dans l’annonce : seuls les meublés sont retenus',
     });
   }
-  if (netCost > criteria.maxNetRent) {
+  if (cost > criteria.maxRent) {
     rejections.push({
       code: 'budget',
       label: 'Hors budget',
-      detail: `${euro(netCost)} net (${euro(cost)} charges comprises − ${euro(aid)} d’aide estimée), plafond à ${euro(criteria.maxNetRent)} net`,
+      detail: `${euro(cost)} charges comprises, plafond à ${euro(criteria.maxRent)}`,
     });
   }
   if (inCity && bikeMinutes != null && bikeMinutes > criteria.maxBikeMinutes) {
@@ -210,17 +214,17 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
   const comfort = comfortScore(listing);
   const aid = estimateApl(rentExcludingCharges(listing, criteria), criteria);
   const netCost = Math.max(cost - aid.amount, 0);
-  const tier = budgetTier(netCost, criteria);
+  const tier = budgetTier(cost, criteria);
 
   const scoreParts: ScorePart[] = [
     {
       id: 'prix',
-      label: 'Loyer net',
-      points: round1(priceScore(netCost, criteria)),
-      max: 40,
-      detail: `${euro(netCost)} après aide au logement estimée (${euro(cost)} charges comprises${
-        estimated ? ', charges estimées' : ''
-      }), budget idéal ${euro(criteria.idealNetRent)} net`,
+      label: 'Loyer',
+      points: round1(priceScore(cost, criteria)),
+      max: 35,
+      detail: `${euro(cost)} charges comprises${estimated ? ' (charges estimées)' : ''}, budget idéal ${euro(
+        criteria.idealRent,
+      )}`,
     },
     {
       id: 'trajet',
@@ -248,15 +252,25 @@ export function evaluate(listing: Listing, criteria: Criteria = CRITERIA): Evalu
       detail: availability.detail,
     },
     {
+      id: 'type',
+      label: 'Type de bien',
+      points: typeScore(listing.type, criteria),
+      max: 10,
+      detail:
+        listing.type === criteria.preferredType
+          ? `${typeLabel(listing.type)} : le type recherché en priorité`
+          : typeLabel(listing.type),
+    },
+    {
       id: 'confort',
       label: 'Confort',
       points: round1(comfort.points),
-      max: 10,
+      max: 5,
       detail: comfort.detail,
     },
   ];
 
-  const rejections = collectRejections(listing, cost, netCost, aid.amount, trip?.minutes ?? null, criteria);
+  const rejections = collectRejections(listing, cost, trip?.minutes ?? null, criteria);
   const score = Math.round(scoreParts.reduce((sum, part) => sum + part.points, 0));
 
   return {

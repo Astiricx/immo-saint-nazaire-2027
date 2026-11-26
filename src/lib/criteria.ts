@@ -8,26 +8,28 @@ export const CRITERIA = {
   city: 'Saint-Nazaire',
 
   /**
-   * T2, T3, T4 et plus, maisons. Studios et T1 ne passent que s'ils font au moins minSurface :
-   * la seule exclusion stricte de taille est « moins de 25 m² ». Chambres et colocations restent écartées.
+   * Studios, T1, T2, T3 et plus, maisons, dès minSurface. Chambres et colocations restent écartées.
    */
   allowedTypes: ['studio', 'T1', 'T2', 'T3+', 'maison'] as PropertyType[],
 
-  /** Surface habitable minimale, en m², pour tous les types de bien. */
-  minSurface: 25,
+  /** Type recherché en priorité : il reçoit la meilleure note « Type de bien ». */
+  preferredType: 'T2' as PropertyType,
+
+  /** Surface habitable minimale, en m², pour tous les types de bien (studios compris). */
+  minSurface: 20,
 
   /** Impératif : seules les annonces clairement identifiées comme meublées sont retenues. */
   requireFurnished: true,
 
   /**
-   * Budget, en loyer NET : loyer charges comprises moins l'aide au logement estimée.
-   * Le loyer affiché sur l'annonce peut donc dépasser ces montants si l'aide le ramène en dessous.
+   * Budget, sur le loyer AFFICHÉ charges comprises. L'aide au logement estimée reste affichée
+   * à titre indicatif, mais n'entre plus dans le filtrage.
    */
-  idealNetRent: 500,
+  idealRent: 500,
   /** Seuil intermédiaire : au-delà, on entre dans le « dernier recours ». */
-  stretchNetRent: 550,
-  /** Plafond absolu : loyer charges comprises − aide estimée ≤ 600 €. */
-  maxNetRent: 600,
+  stretchRent: 550,
+  /** Plafond absolu : 600 € charges comprises. */
+  maxRent: 600,
 
   /**
    * Trajet à vélo maximal jusqu'aux Chantiers de l'Atlantique, en minutes. 30 min couvrent

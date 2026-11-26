@@ -179,11 +179,11 @@ export function FiltersBar({
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3 border-t border-line p-3">
         <RangeField
           id="loyer-max"
-          label="Loyer net maximum"
-          valueLabel={euro(Math.min(filters.maxCost, CRITERIA.maxNetRent))}
-          value={Math.min(filters.maxCost, CRITERIA.maxNetRent)}
+          label="Loyer maximum"
+          valueLabel={euro(Math.min(filters.maxCost, CRITERIA.maxRent))}
+          value={Math.min(filters.maxCost, CRITERIA.maxRent)}
           min={300}
-          max={CRITERIA.maxNetRent}
+          max={CRITERIA.maxRent}
           step={10}
           onChange={(value) => set('maxCost', value)}
         />

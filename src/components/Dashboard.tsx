@@ -143,7 +143,7 @@ export function Dashboard() {
 
   const trackedCount = accepted.filter((l) => entryOf(l.id).status !== DEFAULT_STATUS).length;
   // Budget idéal apprécié sur le loyer net, après aide au logement estimée.
-  const idealCount = accepted.filter((l) => l.netCost <= CRITERIA.idealNetRent).length;
+  const idealCount = accepted.filter((l) => l.monthlyCost <= CRITERIA.idealRent).length;
   const selected = selectedId ? (all.find((l) => l.id === selectedId) ?? null) : null;
   const closeDrawer = useCallback(() => setSelectedId(null), []);
   const closeDialog = useCallback(() => setAdding(false), []);

@@ -10,7 +10,7 @@ export type SortKey = 'score' | 'net-asc' | 'price-asc' | 'price-desc' | 'surfac
 export interface Filters {
   query: string;
   type: TypeFilter;
-  /** Loyer net maximal, après aide au logement estimée. */
+  /** Loyer charges comprises maximal. */
   maxCost: number;
   minSurface: number;
   minScore: number;
@@ -21,7 +21,7 @@ export interface Filters {
 export const DEFAULT_FILTERS: Filters = {
   query: '',
   type: 'all',
-  maxCost: CRITERIA.maxNetRent,
+  maxCost: CRITERIA.maxRent,
   minSurface: CRITERIA.minSurface,
   minScore: 0,
   // Les annonces qui ne précisent pas le quartier restent visibles : à vérifier une par une.
@@ -52,7 +52,7 @@ export function applyFilters(
 ): EvaluatedListing[] {
   const query = normalizeText(filters.query);
   return listings.filter((l) => {
-    if (l.netCost > filters.maxCost) return false;
+    if (l.monthlyCost > filters.maxCost) return false;
     if (l.surface < filters.minSurface) return false;
     if (l.score < filters.minScore) return false;
     if (filters.zone === 'coeur' && l.zone !== 'coeur') return false;

@@ -113,13 +113,11 @@ export function KanbanBoard({
                       }`}
                     >
                       <p className="font-display text-2xl font-semibold leading-none tabular-nums">
-                        {euro(l.netCost)}
-                        <span className="ml-1 font-sans text-sm font-normal text-accent">net</span>
+                        {euro(l.monthlyCost)}
+                        <span className="ml-1 font-sans text-sm font-normal text-muted">CC</span>
                       </p>
                       <p className="mt-1 text-xs tabular-nums text-muted">
-                        <abbr title="charges comprises" className="no-underline">{euro(l.monthlyCost)} CC</abbr>
-                        {' − '}
-                        {euro(l.housingAid)} d’aide
+                        ≈ {euro(l.netCost)} après APL estimée
                       </p>
                       <h3 className="mt-1.5 text-sm font-medium leading-snug">
                         <button

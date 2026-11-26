@@ -83,7 +83,7 @@ export function ListingsTable({
               sort={sort}
               onSort={onSort}
             />
-            <SortHeader label="Net après APL" sortKeys={['net-asc']} sort={sort} onSort={onSort} align="right" />
+            <SortHeader label="Après APL (indicatif)" sortKeys={['net-asc']} sort={sort} onSort={onSort} align="right" />
             <SortHeader label="Vélo" sortKeys={['bike']} sort={sort} onSort={onSort} align="right" />
             <th scope="col" className="px-3 py-2 text-left font-medium">
               Disponibilité
@@ -124,15 +124,13 @@ export function ListingsTable({
                   </span>
                   {l.costIsEstimated ? <span className="text-xs text-muted">estimé</span> : null}
                 </div>
+                <div className="mt-1.5 w-24">
+                  <LoadLine cost={l.monthlyCost} />
+                </div>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                <span className="font-display text-xl font-semibold leading-none tabular-nums text-accent">
-                  {euro(l.netCost)}
-                </span>
+                <span className="tabular-nums text-accent">{euro(l.netCost)}</span>
                 <span className="block text-xs text-muted">aide {euro(l.housingAid)}</span>
-                <div className="ml-auto mt-1.5 w-24">
-                  <LoadLine cost={l.netCost} />
-                </div>
               </td>
               <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
                 {l.bikeMinutes != null ? `${l.bikeMinutes} min` : 'À vérifier'}

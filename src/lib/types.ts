@@ -91,7 +91,7 @@ export interface Listing {
 }
 
 export interface ScorePart {
-  id: 'prix' | 'trajet' | 'secteur' | 'disponibilite' | 'confort';
+  id: 'prix' | 'trajet' | 'secteur' | 'type' | 'disponibilite' | 'confort';
   label: string;
   points: number;
   max: number;

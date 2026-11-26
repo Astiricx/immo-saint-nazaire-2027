@@ -1,6 +1,6 @@
 # Saint-Nazaire 2027
 
-Tableau de bord pour trouver un **logement meublé à Saint-Nazaire** (T2, T3, T4 ou maison), à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
+Tableau de bord pour trouver un **logement meublé à Saint-Nazaire** (T2 en priorité, studios et grands logements acceptés), à vélo des **Chantiers de l'Atlantique**, pour un emménagement en **janvier 2027**.
 
 Chaque matin, une GitHub Action collecte les annonces de location (grands portails, agences, alertes e-mail), écarte celles qui sortent des critères, publie le résultat **chiffré** dans `public/listings.enc.json` et republie le site. Le site déchiffre ce fichier avec votre phrase secrète.
 
@@ -10,10 +10,10 @@ Site : <https://astiricx.github.io/immo-saint-nazaire-2027/>
 
 | Critère | Règle |
 | --- | --- |
-| Type de bien | **T2, T3, T4 et plus, maisons.** Colocations, chambres, parkings et locaux écartés. Un studio n'est écarté que s'il fait moins de 25 m². |
-| Surface | **25 m² minimum**, pour tous les types de bien. |
+| Type de bien | **T2 en priorité** (meilleure note « Type de bien »), studios, T3, T4 et maisons acceptés. Colocations, chambres, parkings et locaux écartés. |
+| Surface | **20 m² minimum**, pour tous les types de bien, studios compris. |
 | Meublé | **Impératif.** Toute annonce qui n'est pas clairement meublée est écartée : « non meublé » ou « vide », mais aussi une annonce muette sur ce point. |
-| Loyer | **600 € net maximum** : loyer charges comprises − aide au logement estimée ≤ 600 €. Le loyer affiché peut donc dépasser 600 € (jusqu'à 760 € environ pour un T2) si l'aide le ramène en dessous. Budget idéal : 500 € net. |
+| Loyer | **600 € charges comprises maximum**, sur le loyer affiché (charges estimées quand l'annonce est hors charges). L'aide au logement estimée reste affichée à titre indicatif, sans entrer dans le filtrage. Budget idéal : 500 €. |
 | Commune | Saint-Nazaire (44600) uniquement. |
 | Secteurs | Centre-ville, front de mer prolongé par la piste cyclable du littoral (Villès-Martin, Kerlédé, Rocher du Lion) et Parc paysager : meilleure note de secteur. |
 | Trajet | 30 minutes à vélo au maximum jusqu'aux Chantiers, quand l'annonce permet de situer le logement : jusqu'un peu après le Rocher du Lion par le front de mer. |
@@ -41,7 +41,7 @@ Le bilan de chaque collecte (sources lues, annonces retenues, motifs d'exclusion
 3. **Jeton.** Ajoutez le secret `APIFY_TOKEN` de la même façon.
 4. Lancez la collecte : *Actions > Collecte quotidienne des annonces > Run workflow*.
 
-Aucune limite de volume : chaque portail renvoie toutes les annonces de la recherche (Saint-Nazaire, maisons et appartements, 25 m² minimum, meublé quand le portail le permet, loyer affiché jusqu'à 800 €, soit le plafond net plus l'aide maximale). Les Actors sont payés au résultat, de un à quelques dollars pour mille annonces, plus le trafic des proxys résidentiels. Votre consommation est visible dans la console Apify.
+Aucune limite de volume : chaque portail renvoie toutes les annonces de la recherche (Saint-Nazaire, maisons et appartements, 20 m² minimum, meublé quand le portail le permet, loyer affiché jusqu'à 600 €). Les Actors sont payés au résultat, de un à quelques dollars pour mille annonces, plus le trafic des proxys résidentiels. Votre consommation est visible dans la console Apify.
 
 **Crédit.** L'offre gratuite d'Apify inclut 5 $ d'usage par mois. Chaque exécution d'Actor est plafonnée à 0,75 $ ([`apify.ts`](scripts/sources/apify.ts), `MAX_RUN_COST_USD`) : plafond imposé par Apify pour les Actors payés au résultat, arrêt par la collecte pour ceux payés à l'usage, et 20 minutes au plus. Le journal indique la consommation de chaque exécution. Quand le crédit est épuisé, la collecte le signale avec sa date de renouvellement, conserve les annonces déjà retenues et continue avec les autres sources.
 
@@ -61,7 +61,7 @@ Ce dispositif réduit le risque, il ne le supprime pas : la collecte automatisé
 
 ### Activer les alertes e-mail
 
-1. Sur les portails, lancez une recherche « location, Saint-Nazaire, meublé, 800 € max » et créez une alerte e-mail quotidienne.
+1. Sur les portails, lancez une recherche « location, Saint-Nazaire, meublé, 600 € max » et créez une alerte e-mail quotidienne.
 2. Créez un mot de passe d'application Gmail : *Compte Google > Sécurité > Validation en deux étapes > Mots de passe des applications*.
 3. Ajoutez les secrets `IMAP_USER` (votre adresse Gmail) et `IMAP_PASSWORD` (le mot de passe d'application). Pour une autre messagerie, ajoutez aussi `IMAP_HOST`.
 
@@ -102,15 +102,15 @@ Node.js 20.9 ou plus récent.
 | `npm test` | Tests de l'extraction, du filtrage et du score |
 | `npm run build` | Vérification des types et export statique dans `out/` |
 
-## Aide au logement et loyer net
+## Aide au logement (indicative)
 
-Chaque annonce affiche, en plus du loyer charges comprises, le **loyer net estimé après APL** : ce qui reste à payer chaque mois une fois l'aide au logement déduite. La fiche détaille le calcul.
+Chaque annonce affiche, en plus du loyer charges comprises, une **estimation indicative du reste à payer après APL**. Elle n'intervient ni dans le filtrage ni dans le score. La fiche détaille le calcul.
 
 L'estimation applique le barème officiel des aides personnelles au logement (APL et ALS, même formule), en vigueur au 1er octobre 2026, pour un locataire seul :
 
 - **Ressources :** pour un étudiant, la CAF ne retient pas les revenus réels mais un forfait annuel, même sans aucun revenu : 8 600 € pour un non-boursier, 6 900 € pour un boursier.
 - **Zone :** zone 3 par défaut. L'agglomération de Saint-Nazaire dépasse 100 000 habitants, ce qui correspond normalement à la zone 2. La zone 3 est le choix prudent : environ 17 € d'aide en moins par mois.
-- **Résultat :** environ 186 € par mois en zone 3 (203 € en zone 2), quasi identique pour toutes les annonces. Le loyer retenu par la CAF est plafonné à 275 € hors charges (personne seule, quel que soit le nombre de pièces). Au-delà de 688 € hors charges, l'aide diminue, puis s'annule vers 850 € hors charges : c'est pourquoi le plafond de 600 € net correspond à environ 760 € charges comprises.
+- **Résultat :** environ 186 € par mois en zone 3 (203 € en zone 2), quasi identique pour toutes les annonces. Le loyer retenu par la CAF est plafonné à 275 € hors charges (personne seule, quel que soit le nombre de pièces). Au-delà de 688 € hors charges, l'aide diminue, puis s'annule vers 850 € hors charges.
 
 Le profil (zone, boursier, ressources) se règle dans `housingAid`, dans [`src/lib/criteria.ts`](src/lib/criteria.ts), et le barème dans [`src/lib/apl.ts`](src/lib/apl.ts). C'est une estimation : seule la CAF fixe le droit, sur son simulateur. Depuis le 1er juillet 2026, certains étudiants étrangers non boursiers n'y ont plus droit.
 
@@ -118,11 +118,12 @@ Le profil (zone, boursier, ressources) se règle dans `housingAid`, dans [`src/l
 
 | Critère | Points | Barème |
 | --- | --- | --- |
-| Loyer net | 40 | Loyer après aide au logement estimée : 40 points jusqu'à 300 €, 32 au budget idéal de 500 €, puis dégressif jusqu'à 8 à 600 € |
+| Loyer | 35 | Loyer charges comprises : 35 points jusqu'à 300 €, 28 au budget idéal de 500 €, puis dégressif jusqu'à 7 à 600 € |
 | Trajet à vélo | 25 | Maximum jusqu'à 8 minutes, dégressif jusqu'à 30 ; 10 points si l'adresse n'est pas précisée |
 | Secteur | 15 | Centre-ville, front de mer jusqu'au Rocher du Lion ou Parc paysager 15, quartier voisin 8, non précisé 5 |
 | Disponibilité | 10 | Maximum entre le 1er décembre 2026 et le 31 janvier 2027 |
-| Confort | 10 | Surface, charges comprises, meublé, local vélo |
+| Type de bien | 10 | T2 10, T3 et plus ou maison 7, T1 5, studio 4 |
+| Confort | 5 | Surface, charges comprises, local vélo |
 
 Quand une annonce donne une rue, elle est géocodée par le service public de la Géoplateforme (IGN). Le trajet est estimé à partir de la distance à vol d'oiseau jusqu'à l'entrée des Chantiers côté Penhoët, majorée de 30 % pour contourner les bassins, à 16 km/h (piste cyclable plate et continue), plus 2 minutes. C'est un ordre de grandeur pour trier : vérifiez l'itinéraire réel.
 

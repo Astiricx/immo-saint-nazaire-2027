@@ -66,8 +66,8 @@ export function NewListings({
                 </span>
                 <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-sm text-muted">
                   <span>
-                    <span className="font-medium tabular-nums text-ink">{euro(l.netCost)} net</span> (
-                    {euro(l.monthlyCost)} CC − {euro(l.housingAid)} d’aide)
+                    <span className="font-medium tabular-nums text-ink">{euro(l.monthlyCost)} CC</span> (≈{' '}
+                    {euro(l.netCost)} après APL estimée)
                   </span>
                   {l.bikeMinutes != null ? (
                     <span className="inline-flex items-center gap-1">

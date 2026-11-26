@@ -279,7 +279,7 @@ async function main() {
 
   const rejectedTotal = evaluated.length - accepted.length;
   const lines = [
-    `Critères : meublé, ${CRITERIA.minSurface} m² minimum (T2, T3, T4, maison), sans colocation, ${euro(CRITERIA.maxNetRent)} net maximum après aide au logement estimée, ${CRITERIA.maxBikeMinutes} min à vélo des Chantiers.`,
+    `Critères : meublé, ${CRITERIA.minSurface} m² minimum (studio à maison, T2 en priorité), sans colocation, ${euro(CRITERIA.maxRent)} charges comprises maximum (aide au logement indicative, hors filtrage), ${CRITERIA.maxBikeMinutes} min à vélo des Chantiers.`,
     `${collected.length} annonce(s) collectée(s), ${removed} doublon(s), ${unreadable} illisible(s).`,
     `Nouvelles annonces aujourd'hui (absentes des collectes précédentes) : ${newListingsOf(keptListings, today).length}.`,
     `Historique : ${previous?.listings.length ?? 0} annonce(s) dans le fichier précédent${
