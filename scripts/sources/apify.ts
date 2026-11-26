@@ -738,7 +738,10 @@ export function apifySource(portal: ApifyPortal): ListingSource {
         for (const search of Array.isArray(actor.input) ? actor.input : [actor.input]) {
           const { [FURNISHED_SEARCH]: furnishedSearch, ...input } = search;
           if (!(await creditAllowsRun())) {
-            lastError = `crédit Apify presque épuisé (réserve de ${MAX_RUN_COST_USD} $) : exécution reportée`;
+            const renewal = await creditRenewal();
+            lastError = `crédit Apify presque épuisé (réserve de ${MAX_RUN_COST_USD} $) : exécution reportée${
+              renewal ? ` jusqu'au renouvellement du ${renewal}` : ''
+            }`;
             console.log(`  ${actor.actorId} : ${lastError}`);
             break;
           }
